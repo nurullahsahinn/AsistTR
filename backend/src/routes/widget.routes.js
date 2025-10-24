@@ -22,3 +22,4 @@ router.put('/sites/:siteId/settings', authMiddleware, updateSiteSettings);
 
 module.exports = router;
 
+

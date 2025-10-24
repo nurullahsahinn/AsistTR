@@ -95,7 +95,6 @@ async function migrate() {
         site_id UUID REFERENCES sites(id) ON DELETE CASCADE,
         title VARCHAR(500) NOT NULL,
         content TEXT NOT NULL,
-        embedding vector(1536),
         metadata JSONB DEFAULT '{}',
         is_active BOOLEAN DEFAULT true,
         created_at TIMESTAMP DEFAULT NOW(),

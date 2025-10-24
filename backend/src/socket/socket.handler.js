@@ -15,7 +15,24 @@ function socketHandler(io, socket) {
   // Ziyaretçi bağlandı
   socket.on('visitor:connect', async (data) => {
     try {
-      const { siteId, sessionId, visitorInfo } = data;
+      const { apiKey, sessionId, visitorInfo } = data;
+      
+      logger.info('Visitor connect attempt:', { apiKey, sessionId, visitorInfo });
+      
+      // API key'den site bilgisini al
+      const siteResult = await query(
+        'SELECT id FROM sites WHERE api_key = $1',
+        [apiKey]
+      );
+      
+      if (siteResult.rows.length === 0) {
+        logger.error('Invalid API key:', apiKey);
+        socket.emit('error', { message: 'Geçersiz API key' });
+        return;
+      }
+      
+      const siteId = siteResult.rows[0].id;
+      logger.info('Site found:', siteId);
       
       // Ziyaretçi kaydı oluştur veya getir
       let visitor = await query(
@@ -42,8 +59,10 @@ function socketHandler(io, socket) {
           ]
         );
         visitorId = newVisitor.rows[0].id;
+        logger.info('New visitor created:', visitorId);
       } else {
         visitorId = visitor.rows[0].id;
+        logger.info('Existing visitor found:', visitorId);
       }
       
       // Konuşma oluştur
@@ -156,6 +175,48 @@ function socketHandler(io, socket) {
       });
       
       logger.info(`Mesaj gönderildi - Conversation: ${conversationId}`);
+      
+      // Eğer visitor mesajıysa ve agent yoksa, AI otomatik yanıt ver
+      if (senderType === 'visitor') {
+        // Agent online mı kontrol et
+        const agentOnline = await query(
+          `SELECT COUNT(*) as count FROM agents_presence 
+           WHERE status = 'online'`
+        );
+        
+        if (agentOnline.rows[0].count == 0) {
+          // Agent yok, AI yanıt ver
+          logger.info(`Agent offline, AI yanıt üretiliyor - Conversation: ${conversationId}`);
+          
+          try {
+            const { generateRagResponse } = require('../rag/rag.service');
+            const aiResponse = await generateRagResponse(conversationId, body);
+            
+            if (aiResponse && aiResponse.answer) {
+              // AI yanıtını kaydet
+              const aiMessage = await query(
+                `INSERT INTO messages (conversation_id, sender_type, sender_id, body, created_at)
+                 VALUES ($1, 'bot', NULL, $2, NOW())
+                 RETURNING *`,
+                [conversationId, aiResponse.answer]
+              );
+              
+              // AI yanıtını gönder
+              io.to(`conversation:${conversationId}`).emit('message:received', {
+                id: aiMessage.rows[0].id,
+                conversationId,
+                senderType: 'bot',
+                body: aiResponse.answer,
+                createdAt: aiMessage.rows[0].created_at
+              });
+              
+              logger.info(`AI yanıtı gönderildi - Conversation: ${conversationId}`);
+            }
+          } catch (aiError) {
+            logger.error('AI yanıt hatası:', aiError);
+          }
+        }
+      }
       
     } catch (error) {
       logger.error('Message send hatası:', error);

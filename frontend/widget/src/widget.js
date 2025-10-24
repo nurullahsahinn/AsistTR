@@ -11,9 +11,15 @@ import { io } from 'socket.io-client'
   const API_URL = 'http://localhost:4000'
   const WS_URL = 'http://localhost:4000'
   
-  // Script tag'ından API key al
-  const scriptTag = document.currentScript || document.querySelector('script[data-api-key]')
-  const API_KEY = scriptTag?.getAttribute('data-api-key') || ''
+  // Global config'den API key al
+  const API_KEY = window.AsistTRConfig?.apiKey || ''
+  
+  if (!API_KEY) {
+    console.error('AsistTR: API key bulunamadı! window.AsistTRConfig.apiKey ayarlamanız gerekiyor.')
+    return
+  }
+  
+  console.log('AsistTR Widget başlatılıyor...', { API_KEY })
 
   // Session ID oluştur veya al
   let sessionId = localStorage.getItem('asistr_session_id')
@@ -420,14 +426,14 @@ import { io } from 'socket.io-client'
 
   function connectSocket(visitorInfo) {
     socket = io(WS_URL, {
-      transports: ['websocket']
+      transports: ['websocket', 'polling']
     })
 
     socket.on('connect', () => {
-      console.log('Socket bağlandı')
+      console.log('Socket bağlandı:', socket.id)
       
       socket.emit('visitor:connect', {
-        siteId: 'site-id', // API'den alınacak
+        apiKey: API_KEY,
         sessionId,
         visitorInfo
       })

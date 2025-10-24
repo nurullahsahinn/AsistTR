@@ -41,7 +41,7 @@ async function addKnowledge(siteId, title, content, metadata = {}) {
 async function getKnowledgeList(siteId) {
   try {
     const result = await query(
-      `SELECT id, title, metadata, is_active, created_at, updated_at
+      `SELECT id, title, content, metadata, is_active, created_at, updated_at
        FROM knowledge_base
        WHERE site_id = $1
        ORDER BY created_at DESC`,

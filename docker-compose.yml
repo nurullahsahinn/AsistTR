@@ -43,6 +43,9 @@ services:
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      OLLAMA_MODEL: llama3.2:3b
+      OLLAMA_EMBED_MODEL: nomic-embed-text:latest
     ports:
       - "4000:4000"
     depends_on:
@@ -53,7 +56,7 @@ services:
       - /app/node_modules
     networks:
       - asistr_network
-    command: npm run dev
+    command: node app.js
 
   # Frontend Dashboard
   dashboard:
@@ -75,7 +78,23 @@ services:
       - /app/.next
     networks:
       - asistr_network
-    command: npm run dev
+
+  # Widget
+  widget:
+    build:
+      context: ./frontend/widget
+      dockerfile: Dockerfile
+    container_name: asistr_widget
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend/widget:/app
+      - /app/node_modules
+    networks:
+      - asistr_network
 
   # Ollama (Opsiyonel - Local LLM için)
   # ollama:

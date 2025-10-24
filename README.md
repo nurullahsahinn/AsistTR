@@ -235,3 +235,4 @@ Bitirme Projesi - 2024/2025
 
 **Not**: Bu proje aktif geliştirme aşamasındadır. MVP özellikleri tamamlandıkça güncellenecektir.
 
+

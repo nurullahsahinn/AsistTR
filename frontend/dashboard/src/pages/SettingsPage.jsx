@@ -1,9 +1,14 @@
 import { useState, useEffect } from 'react'
 import { siteApi } from '../services/api'
+import { useAuthStore } from '../store/authStore'
+import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { FiCopy } from 'react-icons/fi'
+import { FiCopy, FiAlertCircle } from 'react-icons/fi'
 
 function SettingsPage() {
+  const { user } = useAuthStore()
+  const navigate = useNavigate()
+  const isAdmin = user?.role === 'admin'
   const [sites, setSites] = useState([])
   const [isCreating, setIsCreating] = useState(false)
   const [newSite, setNewSite] = useState({ name: '', domain: '' })
@@ -52,6 +57,29 @@ function SettingsPage() {
   x.parentNode.insertBefore(s, x);
 })();
 </script>`
+  }
+
+  // Admin kontrolü
+  if (!isAdmin) {
+    return (
+      <div className="p-8">
+        <div className="max-w-2xl mx-auto mt-20">
+          <div className="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-8 text-center">
+            <FiAlertCircle className="text-6xl text-yellow-600 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Yetkisiz Erişim</h2>
+            <p className="text-gray-600 mb-6">
+              Site yönetimi sadece admin kullanıcılar için erişilebilir.
+            </p>
+            <button
+              onClick={() => navigate('/')}
+              className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+            >
+              Ana Sayfaya Dön
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (

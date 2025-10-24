@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react'
 import { siteApi, chatApi, ragApi } from '../services/api'
-import { FiMessageCircle, FiUsers, FiCheckCircle, FiClock } from 'react-icons/fi'
+import { useAuthStore } from '../store/authStore'
+import { FiMessageCircle, FiUsers, FiCheckCircle, FiClock, FiShield } from 'react-icons/fi'
 import toast from 'react-hot-toast'
 
 function DashboardPage() {
+  const { user } = useAuthStore()
+  const isAdmin = user?.role === 'admin'
+  
   const [sites, setSites] = useState([])
   const [stats, setStats] = useState({
     totalConversations: 0,
@@ -58,8 +62,19 @@ function DashboardPage() {
   return (
     <div className="p-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
-        <p className="text-gray-600 mt-2">AsistTR yönetim panelinize hoş geldiniz</p>
+        <div className="flex items-center gap-3">
+          <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
+          {isAdmin && (
+            <span className="px-3 py-1 bg-purple-100 text-purple-800 text-sm font-semibold rounded-full flex items-center gap-1">
+              <FiShield className="text-purple-600" />
+              Admin
+            </span>
+          )}
+        </div>
+        <p className="text-gray-600 mt-2">
+          AsistTR yönetim panelinize hoş geldiniz
+          {!isAdmin && ' (Agent Modu)'}
+        </p>
       </div>
 
       {/* İstatistik Kartları */}
@@ -90,60 +105,80 @@ function DashboardPage() {
         />
       </div>
 
-      {/* Siteler */}
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <h2 className="text-xl font-bold mb-4">Kayıtlı Siteler</h2>
-        {sites.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            Henüz kayıtlı site yok. Ayarlar sayfasından yeni site ekleyebilirsiniz.
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {sites.map((site) => (
-              <div key={site.id} className="border rounded-lg p-4 hover:border-primary-500 transition">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <h3 className="font-semibold">{site.name}</h3>
-                    <p className="text-sm text-gray-600">{site.domain}</p>
+      {/* Siteler - Sadece Admin */}
+      {isAdmin && (
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <h2 className="text-xl font-bold mb-4">Kayıtlı Siteler</h2>
+          {sites.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              Henüz kayıtlı site yok. Ayarlar sayfasından yeni site ekleyebilirsiniz.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {sites.map((site) => (
+                <div key={site.id} className="border rounded-lg p-4 hover:border-primary-500 transition">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h3 className="font-semibold">{site.name}</h3>
+                      <p className="text-sm text-gray-600">{site.domain}</p>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-sm ${
+                      site.is_active 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {site.is_active ? 'Aktif' : 'Pasif'}
+                    </span>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-sm ${
-                    site.is_active 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {site.is_active ? 'Aktif' : 'Pasif'}
-                  </span>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
-      {/* AI Durum */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-xl font-bold mb-4">AI Asistan Durumu (Ollama)</h2>
-        {ollamaStatus ? (
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Durum</p>
-              <p className={`font-semibold ${
-                ollamaStatus.status === 'ok' ? 'text-green-600' : 'text-red-600'
-              }`}>
-                {ollamaStatus.status === 'ok' ? '✅ Çalışıyor' : '❌ Çalışmıyor'}
-              </p>
-              <p className="text-xs text-gray-500 mt-1">{ollamaStatus.message}</p>
+      {/* Agent için Yönlendirme */}
+      {!isAdmin && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+          <h2 className="text-lg font-semibold text-blue-900 mb-2">🎯 Agent Modu</h2>
+          <p className="text-blue-700 mb-4">
+            Sohbetler sayfasına giderek müşterilerle konuşmaya başlayabilirsiniz.
+          </p>
+          <a 
+            href="/chat" 
+            className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          >
+            Sohbetlere Git →
+          </a>
+        </div>
+      )}
+
+      {/* AI Durum - Sadece Admin */}
+      {isAdmin && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-bold mb-4">AI Asistan Durumu (Ollama)</h2>
+          {ollamaStatus ? (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Durum</p>
+                <p className={`font-semibold ${
+                  ollamaStatus.status === 'ok' ? 'text-green-600' : 'text-red-600'
+                }`}>
+                  {ollamaStatus.status === 'ok' ? '✅ Çalışıyor' : '❌ Çalışmıyor'}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">{ollamaStatus.message}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-gray-600">Model</p>
+                <p className="font-semibold">{ollamaStatus.model}</p>
+                <p className="text-xs text-gray-500 mt-1">{ollamaStatus.url}</p>
+              </div>
             </div>
-            <div className="text-right">
-              <p className="text-sm text-gray-600">Model</p>
-              <p className="font-semibold">{ollamaStatus.model}</p>
-              <p className="text-xs text-gray-500 mt-1">{ollamaStatus.url}</p>
-            </div>
-          </div>
-        ) : (
-          <p className="text-gray-500">Yükleniyor...</p>
-        )}
-      </div>
+          ) : (
+            <p className="text-gray-500">Yükleniyor...</p>
+          )}
+        </div>
+      )}
     </div>
   )
 }
