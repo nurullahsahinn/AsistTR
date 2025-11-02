@@ -3,8 +3,13 @@
  * Sohbet ve mesaj yönetimi
  */
 
-const { query, transaction } = require('../utils/database');
+const { query, transaction, pool } = require('../utils/database');
 const logger = require('../utils/logger');
+
+// io objesini global değişkenden al
+function getIO() {
+  return global.socketIO;
+}
 
 // Tüm konuşmaları listele (agent için)
 async function getConversations(req, res) {
@@ -16,6 +21,8 @@ async function getConversations(req, res) {
         c.id,
         c.status,
         c.created_at,
+        c.agent_id,
+        agent.name as agent_name,
         v.name as visitor_name,
         v.email as visitor_email,
         s.name as site_name,
@@ -24,6 +31,7 @@ async function getConversations(req, res) {
       FROM conversations c
       LEFT JOIN visitors v ON c.visitor_id = v.id
       LEFT JOIN sites s ON c.site_id = s.id
+      LEFT JOIN users agent ON c.agent_id = agent.id
       WHERE 1=1
     `;
     
@@ -89,14 +97,23 @@ async function closeConversation(req, res) {
     const { conversationId } = req.params;
     const { rating } = req.body;
     
-    await query(
+    const result = await query(
       `UPDATE conversations 
        SET status = 'closed', closed_at = NOW(), rating = $1
-       WHERE id = $2`,
+       WHERE id = $2
+       RETURNING site_id`,
       [rating || null, conversationId]
     );
-    
-    logger.info(`Konuşma kapatıldı: ${conversationId}`);
+
+    if (result.rows.length > 0) {
+      const { site_id } = result.rows[0];
+      // Agent'lara sohbetin kapandığını bildir
+      const io = getIO();
+      io.to(`site:${site_id}:agents`).emit('conversation:closed', { conversationId });
+      logger.info(`Konuşma kapatıldı ve bildirildi: ${conversationId}`);
+    } else {
+      logger.warn(`Kapatılacak konuşma bulunamadı: ${conversationId}`);
+    }
     
     res.json({ message: 'Konuşma kapatıldı' });
     
@@ -110,14 +127,30 @@ async function closeConversation(req, res) {
 async function assignAgent(req, res) {
   try {
     const { conversationId } = req.params;
-    const { agentId } = req.body;
+    const { agentId } = req.body; // Atanacak agent'ın ID'si
+    const requestingAgentName = req.user.name; // Atamayı yapan agent'ın adı
     
-    await query(
-      'UPDATE conversations SET agent_id = $1 WHERE id = $2',
+    const result = await query(
+      'UPDATE conversations SET agent_id = $1 WHERE id = $2 RETURNING site_id',
       [agentId, conversationId]
     );
     
-    res.json({ message: 'Agent atandı' });
+    if (result.rows.length > 0) {
+      const { site_id } = result.rows[0];
+      
+      // Agent'lara sohbetin atandığını bildir
+      const io = getIO();
+      io.to(`site:${site_id}:agents`).emit('conversation:assigned', {
+        conversationId,
+        agentId,
+        agentName: requestingAgentName
+      });
+      
+      logger.info(`Konuşma ${conversationId}, agent ${agentId}'e atandı.`);
+      res.json({ message: 'Agent atandı' });
+    } else {
+      res.status(404).json({ error: 'Konuşma bulunamadı' });
+    }
     
   } catch (error) {
     logger.error('AssignAgent hatası:', error);
@@ -125,11 +158,51 @@ async function assignAgent(req, res) {
   }
 }
 
+// Konuşmayı sil (Sadece Admin)
+async function deleteConversation(req, res) {
+  const { conversationId } = req.params;
+  
+  try {
+    // Transaction içinde silme işlemi yap
+    await transaction(async (client) => {
+      // Silmeden önce site_id'yi al
+      const convResult = await client.query('SELECT site_id FROM conversations WHERE id = $1', [conversationId]);
+      if (convResult.rows.length === 0) {
+        throw new Error('Konuşma bulunamadı');
+      }
+      const { site_id } = convResult.rows[0];
+
+      // Önce mesajları sil
+      await client.query('DELETE FROM messages WHERE conversation_id = $1', [conversationId]);
+      
+      // Sonra konuşmayı sil
+      await client.query('DELETE FROM conversations WHERE id = $1', [conversationId]);
+
+      // Agent'lara sohbetin silindiğini bildir
+      const io = getIO();
+      io.to(`site:${site_id}:agents`).emit('conversation:deleted', { conversationId });
+      
+      logger.info(`Konuşma silindi ve bildirildi: ${conversationId}`);
+    });
+
+    res.status(200).json({ message: 'Konuşma başarıyla silindi' });
+
+  } catch (error) {
+    logger.error('DeleteConversation hatası:', error);
+    if (error.message === 'Konuşma bulunamadı') {
+      return res.status(404).json({ error: error.message });
+    }
+    res.status(500).json({ error: 'Konuşma silinemedi' });
+  }
+}
+
 module.exports = {
   getConversations,
   getMessages,
   closeConversation,
-  assignAgent
+  assignAgent,
+  deleteConversation
 };
+
 
 

@@ -10,6 +10,16 @@ async function migrate() {
   try {
     logger.info('Migration başlıyor...');
 
+    // PostgreSQL extensions
+    await query('CREATE EXTENSION IF NOT EXISTS pgcrypto');
+    logger.info('✅ pgcrypto extension oluşturuldu');
+    
+    await query('CREATE EXTENSION IF NOT EXISTS vector');
+    logger.info('✅ pgvector extension oluşturuldu');
+    
+    await query('CREATE EXTENSION IF NOT EXISTS pg_trgm');
+    logger.info('✅ pg_trgm extension oluşturuldu');
+
     // Users tablosu
     await query(`
       CREATE TABLE IF NOT EXISTS users (
@@ -18,6 +28,7 @@ async function migrate() {
         email VARCHAR(255) UNIQUE NOT NULL,
         password_hash VARCHAR(255) NOT NULL,
         role VARCHAR(50) NOT NULL DEFAULT 'agent',
+        site_id UUID,
         avatar_url TEXT,
         is_active BOOLEAN DEFAULT true,
         created_at TIMESTAMP DEFAULT NOW(),
@@ -95,6 +106,7 @@ async function migrate() {
         site_id UUID REFERENCES sites(id) ON DELETE CASCADE,
         title VARCHAR(500) NOT NULL,
         content TEXT NOT NULL,
+        embedding vector(768),
         metadata JSONB DEFAULT '{}',
         is_active BOOLEAN DEFAULT true,
         created_at TIMESTAMP DEFAULT NOW(),
@@ -103,6 +115,21 @@ async function migrate() {
     `);
     logger.info('✅ Knowledge Base tablosu oluşturuldu');
 
+    // Eğer embedding sütunu yoksa ekle (eski tablolar için)
+    try {
+      const colCheck = await query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name='knowledge_base' AND column_name='embedding'
+      `);
+      if (colCheck.rows.length === 0) {
+        await query('ALTER TABLE knowledge_base ADD COLUMN embedding vector(768)');
+        logger.info('✅ embedding sütunu eklendi');
+      }
+    } catch (err) {
+      logger.warn('Embedding sütunu kontrolü atlandı:', err.message);
+    }
+
     // Agents Presence tablosu
     await query(`
       CREATE TABLE IF NOT EXISTS agents_presence (
@@ -110,16 +137,37 @@ async function migrate() {
         agent_id UUID REFERENCES users(id) ON DELETE CASCADE,
         socket_id VARCHAR(255),
         status VARCHAR(50) DEFAULT 'offline',
-        last_seen TIMESTAMP DEFAULT NOW()
+        last_seen TIMESTAMP DEFAULT NOW(),
+        CONSTRAINT unique_agent_id UNIQUE (agent_id)
       )
     `);
     logger.info('✅ Agents Presence tablosu oluşturuldu');
 
     // İndeksler
     await query('CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at)');
     await query('CREATE INDEX IF NOT EXISTS idx_conversations_site ON conversations(site_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_conversations_status ON conversations(status)');
     await query('CREATE INDEX IF NOT EXISTS idx_visitors_site ON visitors(site_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_visitors_session ON visitors(session_id)');
     await query('CREATE INDEX IF NOT EXISTS idx_knowledge_site ON knowledge_base(site_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_knowledge_content_trgm ON knowledge_base USING gin (content gin_trgm_ops)');
+    
+    // Vector index for similarity search (sadece embedding sütunu varsa)
+    try {
+      const colCheck = await query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name='knowledge_base' AND column_name='embedding'
+      `);
+      if (colCheck.rows.length > 0) {
+        await query('CREATE INDEX IF NOT EXISTS idx_knowledge_embedding ON knowledge_base USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100)');
+        logger.info('✅ Vector index oluşturuldu');
+      }
+    } catch (err) {
+      logger.warn('Vector index oluşturulamadı:', err.message);
+    }
+    
     logger.info('✅ İndeksler oluşturuldu');
 
     logger.info('🎉 Migration başarıyla tamamlandı!');

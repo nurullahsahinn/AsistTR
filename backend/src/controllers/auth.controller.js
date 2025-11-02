@@ -14,7 +14,8 @@ function generateToken(user) {
     { 
       id: user.id, 
       email: user.email, 
-      role: user.role 
+      role: user.role,
+      site_id: user.site_id // site_id'yi token'a ekle
     },
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
@@ -43,7 +44,7 @@ async function register(req, res) {
     const result = await query(
       `INSERT INTO users (name, email, password_hash, role) 
        VALUES ($1, $2, $3, $4) 
-       RETURNING id, name, email, role, created_at`,
+       RETURNING id, name, email, role, site_id, created_at`,
       [name, email, passwordHash, role]
     );
 
@@ -58,7 +59,8 @@ async function register(req, res) {
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role
+        role: user.role,
+        site_id: user.site_id
       },
       token
     });
@@ -104,6 +106,7 @@ async function login(req, res) {
         name: user.name,
         email: user.email,
         role: user.role,
+        site_id: user.site_id, // site_id'yi yanıta ekle
         avatar_url: user.avatar_url
       },
       token
@@ -119,7 +122,7 @@ async function login(req, res) {
 async function getMe(req, res) {
   try {
     const result = await query(
-      'SELECT id, name, email, role, avatar_url, created_at FROM users WHERE id = $1',
+      'SELECT id, name, email, role, site_id, avatar_url, created_at FROM users WHERE id = $1',
       [req.user.id]
     );
 
@@ -140,5 +143,6 @@ module.exports = {
   login,
   getMe
 };
+
 
 

@@ -8,9 +8,10 @@ const {
   getConversations, 
   getMessages, 
   closeConversation,
-  assignAgent 
+  assignAgent,
+  deleteConversation // Yeni controller fonksiyonu
 } = require('../controllers/chat.controller');
-const { authMiddleware } = require('../middleware/auth.middleware');
+const { authMiddleware, adminOnly } = require('../middleware/auth.middleware'); // adminOnly'yi import et
 const { apiLimiter } = require('../middleware/rateLimit.middleware');
 
 // Tüm route'lar auth gerektirir
@@ -29,6 +30,10 @@ router.post('/:conversationId/close', closeConversation);
 // Agent ata
 router.post('/:conversationId/assign', assignAgent);
 
+// Konuşmayı sil (Sadece Admin)
+router.delete('/:conversationId', adminOnly, deleteConversation);
+
 module.exports = router;
+
 
 

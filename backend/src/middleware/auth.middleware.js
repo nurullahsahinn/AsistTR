@@ -39,14 +39,19 @@ function authMiddleware(req, res, next) {
   }
 }
 
-// Admin kontrolü
-function adminMiddleware(req, res, next) {
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Bu işlem için yetkiniz yok' });
+// Sadece admin yetkisi olanların geçebileceği middleware
+function adminOnly(req, res, next) {
+  if (req.user && req.user.role === 'admin') {
+    next();
+  } else {
+    res.status(403).json({ error: 'Bu işlem için yetkiniz yok' });
   }
-  next();
 }
 
-module.exports = { authMiddleware, adminMiddleware };
+module.exports = {
+  authMiddleware,
+  adminOnly
+};
+
 
 

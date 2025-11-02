@@ -32,140 +32,75 @@ import { io } from 'socket.io-client'
   let conversationId = null
   let visitorId = null
   let isOpen = false
-  let isUploading = false;
-  let streamingMessage = ''; // Streaming mesaj
-
-  // Markdown parser
-  function parseMarkdown(text) {
-    const lines = text.split('\n');
-    let html = '';
-    let inCodeBlock = false;
-    let inList = false;
-
-    lines.forEach(line => {
-      // Code block
-      if (line.trim().startsWith('```')) {
-        if (inCodeBlock) {
-          html += '</code></pre>';
-          inCodeBlock = false;
-        } else {
-          html += '<pre style="background: rgba(0,0,0,0.05); padding: 8px; border-radius: 4px; overflow-x: auto; margin: 8px 0;"><code style="font-family: monospace; font-size: 13px;">';
-          inCodeBlock = true;
-        }
-        return;
-      }
-
-      if (inCodeBlock) {
-        html += line + '\n';
-        return;
-      }
-
-      // Heading 2
-      if (line.startsWith('## ')) {
-        html += `<h2 style="font-size: 16px; font-weight: bold; margin: 12px 0 8px 0;">${line.replace('## ', '')}</h2>`;
-        return;
-      }
-
-      // Heading 3
-      if (line.startsWith('### ')) {
-        html += `<h3 style="font-size: 15px; font-weight: 600; margin: 10px 0 6px 0;">${line.replace('### ', '')}</h3>`;
-        return;
-      }
-
-      // List item
-      if (line.trim().startsWith('- ') || line.trim().match(/^\d+\. /)) {
-        if (!inList) {
-          html += '<ul style="margin: 8px 0; padding-left: 20px;">';
-          inList = true;
-        }
-        const text = line.trim().replace(/^- /, '').replace(/^\d+\. /, '');
-        html += `<li style="margin: 4px 0;">${formatInline(text)}</li>`;
-        return;
-      } else if (inList && line.trim() !== '') {
-        html += '</ul>';
-        inList = false;
-      }
-
-      // Empty line
-      if (line.trim() === '') {
-        if (inList) {
-          html += '</ul>';
-          inList = false;
-        }
-        return;
-      }
-
-      // Regular paragraph
-      if (line.trim()) {
-        html += `<p style="margin: 6px 0; line-height: 1.5;">${formatInline(line)}</p>`;
-      }
-    });
-
-    if (inList) html += '</ul>';
-    if (inCodeBlock) html += '</code></pre>';
-
-    return html;
-  }
-
-  // Format inline markdown (bold, code)
-  function formatInline(text) {
-    // Bold **text**
-    text = text.replace(/\*\*(.+?)\*\*/g, '<strong style="font-weight: bold;">$1</strong>');
-    
-    // Inline code `text`
-    text = text.replace(/`(.+?)`/g, '<code style="background: rgba(0,0,0,0.08); padding: 2px 6px; border-radius: 3px; font-family: monospace; font-size: 13px;">$1</code>');
-    
-    return text;
-  }
-
-  const AttachmentPreview = ({ file }) => {
-    const isImage = file.type.startsWith('image/');
-    if (isImage) {
-      return `<img src="${file.url}" alt="${file.name}" class="asistr-attachment-image" />`;
-    }
-    return `
-      <a href="${file.url}" target="_blank" rel="noopener noreferrer" class="asistr-attachment-link">
-        <svg width="20" height="20" viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13v4h-2v-4H8l4-4 4 4h-3z"/></svg>
-        <span>${file.name}</span>
-      </a>
-    `;
-  };
 
   // Widget HTML
   const widgetHTML = `
     <style>
+      @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+      
+      :root {
+        --primary-color: #f2480b;
+        --primary-light: #ff6633;
+        --primary-dark: #d13c00;
+        --dark-bg: #090c10;
+        --dark-secondary: #151b25;
+        --glass-bg: rgba(255, 255, 255, 0.05);
+        --glass-border: rgba(255, 255, 255, 0.1);
+        --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+      }
+      
       #asistr-widget {
         position: fixed;
         bottom: 20px;
         right: 20px;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-family: 'Poppins', sans-serif;
         z-index: 99999;
       }
 
       #asistr-bubble {
-        width: 60px;
-        height: 60px;
-        background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+        width: 65px;
+        height: 65px;
+        background: linear-gradient(135deg, rgba(242, 72, 11, 0.9) 0%, rgba(209, 60, 0, 0.9) 100%);
+        backdrop-filter: blur(5px);
+        -webkit-backdrop-filter: blur(5px);
+        border: 2px solid rgba(242, 72, 11, 0.3);
         border-radius: 50%;
         display: flex;
         align-items: center;
-        justify-content: center;
-        cursor: pointer !important;
-        box-shadow: 0 6px 20px rgba(2, 132, 199, 0.4), 0 2px 8px rgba(0,0,0,0.15);
-        transition: all 0.3s ease;
-        border: 2px solid rgba(255,255,255,0.2);
+        justify-center;
+        cursor: pointer;
+        box-shadow: 0 8px 24px rgba(242, 72, 11, 0.4), 
+                    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        overflow: hidden;
+        position: relative;
+      }
+      
+      #asistr-bubble::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+        transform: rotate(45deg);
+        transition: all 0.6s;
+      }
+      
+      #asistr-bubble:hover::before {
+        left: 100%;
       }
 
       #asistr-bubble:hover {
         transform: scale(1.1);
-        box-shadow: 0 8px 25px rgba(2, 132, 199, 0.5), 0 4px 12px rgba(0,0,0,0.2);
+        box-shadow: 0 6px 16px rgba(0,0,0,0.2);
       }
 
       #asistr-bubble svg {
         width: 28px;
         height: 28px;
         fill: white;
-        pointer-events: none;
       }
 
       #asistr-chat-window {
@@ -175,13 +110,12 @@ import { io } from 'socket.io-client'
         width: 380px;
         height: 550px;
         background: white;
-        border-radius: 20px;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05);
+        border-radius: 16px;
+        box-shadow: 0 12px 48px rgba(0,0,0,0.2);
         display: none;
         flex-direction: column;
         overflow: hidden;
         animation: slideUp 0.3s ease-out;
-        cursor: default !important;
       }
 
       @keyframes slideUp {
@@ -206,7 +140,6 @@ import { io } from 'socket.io-client'
         display: flex;
         justify-content: space-between;
         align-items: center;
-        cursor: default !important;
       }
 
       #asistr-header h3 {
@@ -225,20 +158,18 @@ import { io } from 'socket.io-client'
         background: rgba(255,255,255,0.2);
         border: none;
         color: white;
-        width: 32px;
-        height: 32px;
+        width: 30px;
+        height: 30px;
         border-radius: 50%;
-        cursor: pointer !important;
+        cursor: pointer;
         display: flex;
         align-items: center;
-        justify-content: center;
-        font-size: 18px;
-        transition: all 0.2s ease;
+        justify-center;
+        font-size: 20px;
       }
 
       #asistr-close:hover {
         background: rgba(255,255,255,0.3);
-        transform: scale(1.1);
       }
 
       #asistr-welcome-form {
@@ -281,9 +212,8 @@ import { io } from 'socket.io-client'
         flex: 1;
         overflow-y: auto;
         padding: 20px;
-        background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+        background: #f9fafb;
         display: none;
-        cursor: default !important;
       }
 
       #asistr-messages.active {
@@ -311,14 +241,12 @@ import { io } from 'socket.io-client'
       .asistr-message.agent .asistr-message-bubble {
         background: white;
         color: #1f2937;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.05);
-        border: 1px solid rgba(0,0,0,0.05);
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
       }
 
       .asistr-message.visitor .asistr-message-bubble {
-        background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+        background: #0284c7;
         color: white;
-        box-shadow: 0 2px 8px rgba(2, 132, 199, 0.3);
       }
 
       .asistr-message-time {
@@ -332,7 +260,6 @@ import { io } from 'socket.io-client'
         border-top: 1px solid #e5e7eb;
         background: white;
         display: none;
-        cursor: default !important;
       }
 
       #asistr-input-area.active {
@@ -342,55 +269,39 @@ import { io } from 'socket.io-client'
       #asistr-input-form {
         display: flex;
         gap: 8px;
-        align-items: flex-end;
       }
 
       #asistr-message-input {
         flex: 1;
-        padding: 12px 16px;
+        padding: 10px 14px;
         border: 1px solid #e5e7eb;
-        border-radius: 24px;
+        border-radius: 20px;
         font-size: 14px;
         outline: none;
         resize: none;
-        max-height: 120px;
-        min-height: 44px;
-        height: 44px;
-        font-family: inherit;
-        background: #f9fafb;
-        transition: all 0.2s ease;
-        box-sizing: border-box;
-        display: block;
-        width: 100%;
-        overflow-y: auto;
-        line-height: 1.5;
+        max-height: 100px;
       }
 
       #asistr-message-input:focus {
         border-color: #0284c7;
-        background: white;
-        box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.1);
       }
 
       #asistr-send-btn {
-        width: 44px;
-        height: 44px;
-        background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+        width: 40px;
+        height: 40px;
+        background: #0284c7;
         border: none;
         border-radius: 50%;
         color: white;
-        cursor: pointer !important;
+        cursor: pointer;
         display: flex;
         align-items: center;
-        justify-content: center;
-        transition: all 0.2s ease;
-        box-shadow: 0 2px 8px rgba(2, 132, 199, 0.3);
-        flex-shrink: 0;
+        justify-center;
+        transition: background 0.2s;
       }
 
       #asistr-send-btn:hover {
-        transform: scale(1.05);
-        box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4);
+        background: #0369a1;
       }
 
       #asistr-send-btn:disabled {
@@ -429,11 +340,6 @@ import { io } from 'socket.io-client'
         30% { transform: translateY(-10px); }
       }
 
-      @keyframes blink {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0; }
-      }
-
       ::-webkit-scrollbar {
         width: 6px;
       }
@@ -450,33 +356,6 @@ import { io } from 'socket.io-client'
       ::-webkit-scrollbar-thumb:hover {
         background: #94a3b8;
       }
-
-      #asistr-attach-btn {
-        width: 44px;
-        height: 44px;
-        background: transparent;
-        border: none;
-        color: #6b7280;
-        cursor: pointer !important;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: all 0.2s ease;
-        border-radius: 50%;
-        flex-shrink: 0;
-      }
-      #asistr-attach-btn:hover { 
-        color: #0284c7; 
-        background: rgba(2, 132, 199, 0.1);
-        transform: scale(1.05);
-      }
-      #asistr-attach-btn:disabled { cursor: not-allowed; opacity: 0.5; }
-
-      .hidden { display: none !important; }
-
-      .asistr-attachment-image { max-width: 100%; max-height: 150px; border-radius: 8px; margin-top: 5px; }
-      .asistr-attachment-link { display: flex; align-items: center; gap: 8px; background: #f3f4f6; padding: 8px; border-radius: 8px; color: #1f2937; text-decoration: none; margin-top: 5px; }
-
     </style>
 
     <div id="asistr-widget">
@@ -512,10 +391,6 @@ import { io } from 'socket.io-client'
         <!-- Input Area -->
         <div id="asistr-input-area">
           <form id="asistr-input-form">
-            <button type="button" id="asistr-attach-btn">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-            </button>
-            <input type="file" id="asistr-file-input" class="hidden" />
             <textarea 
               id="asistr-message-input" 
               placeholder="Mesajınızı yazın..." 
@@ -543,25 +418,13 @@ import { io } from 'socket.io-client'
     document.getElementById('asistr-close').addEventListener('click', toggleChat)
     document.getElementById('asistr-start-chat').addEventListener('click', startChat)
     document.getElementById('asistr-input-form').addEventListener('submit', sendMessage)
-    document.getElementById('asistr-attach-btn').addEventListener('click', () => {
-      document.getElementById('asistr-file-input').click();
-    });
-    document.getElementById('asistr-file-input').addEventListener('change', handleFileUpload);
     
-    // Enter tuşu ile gönder ve auto-resize
-    const messageInput = document.getElementById('asistr-message-input');
-    
-    messageInput.addEventListener('keydown', (e) => {
+    // Enter tuşu ile gönder
+    document.getElementById('asistr-message-input').addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault()
         sendMessage(e)
       }
-    })
-    
-    // Auto-resize textarea
-    messageInput.addEventListener('input', function() {
-      this.style.height = 'auto';
-      this.style.height = Math.min(this.scrollHeight, 120) + 'px';
     })
   }
 
@@ -619,20 +482,7 @@ import { io } from 'socket.io-client'
 
     socket.on('message:received', (message) => {
       if (message.senderType === 'agent' || message.senderType === 'bot') {
-        // Streaming mesajı temizle
-        streamingMessage = '';
-        const streamingDiv = document.getElementById('asistr-streaming-message');
-        if (streamingDiv) streamingDiv.remove();
-        
         addMessage('agent', message.body)
-      }
-    })
-
-    // Streaming mesaj parçası
-    socket.on('message:chunk', (data) => {
-      if (data.conversationId === conversationId) {
-        streamingMessage += data.chunk;
-        updateStreamingMessage(streamingMessage);
       }
     })
 
@@ -649,61 +499,28 @@ import { io } from 'socket.io-client'
     })
   }
 
-  function sendMessage(e, attachments = null) {
-    if (e) e.preventDefault()
+  function sendMessage(e) {
+    e.preventDefault()
     
     const input = document.getElementById('asistr-message-input')
     const message = input.value.trim()
 
-    if ((!message && !attachments) || !socket || !conversationId) return
+    if (!message || !socket || !conversationId) return
 
     // Mesajı gönder
     socket.emit('message:send', {
       conversationId,
       body: message,
-      senderType: 'visitor',
-      attachments: attachments
+      senderType: 'visitor'
     })
 
     // UI'ye ekle
-    addMessage('visitor', message, attachments)
+    addMessage('visitor', message)
     input.value = ''
-    input.style.height = '44px' // Reset to initial height
+    input.style.height = 'auto'
   }
 
-  async function handleFileUpload(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    document.getElementById('asistr-attach-btn').disabled = true;
-
-    try {
-      const response = await fetch(`${API_URL}/api/upload`, {
-        method: 'POST',
-        body: formData,
-        // Auth token'i eklememiz gerekebilir, ama şimdilik public yapalım
-      });
-
-      if (!response.ok) {
-        throw new Error('Dosya yüklenemedi.');
-      }
-      
-      const result = await response.json();
-      sendMessage(null, [result.file]);
-
-    } catch (error) {
-      console.error('Dosya yükleme hatası:', error);
-      alert('Dosya yüklenirken bir hata oluştu.');
-    } finally {
-      document.getElementById('asistr-attach-btn').disabled = false;
-      event.target.value = ""; // Input'u sıfırla
-    }
-  }
-
-  function addMessage(type, text, attachments = null) {
+  function addMessage(type, text) {
     const messagesContainer = document.getElementById('asistr-messages')
     const messageDiv = document.createElement('div')
     messageDiv.className = `asistr-message ${type}`
@@ -711,50 +528,15 @@ import { io } from 'socket.io-client'
     const now = new Date()
     const time = now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
     
-    const attachmentsHTML = attachments 
-      ? attachments.map(file => AttachmentPreview({ file })).join('') 
-      : '';
-
-    // Markdown parse et (sadece agent/bot mesajları için)
-    const messageContent = (type === 'agent' || type === 'bot') ? parseMarkdown(text) : text;
-
     messageDiv.innerHTML = `
       <div class="asistr-message-bubble">
-        ${text ? `<div>${messageContent}</div>` : ''}
-        ${attachmentsHTML ? `<div class="mt-2">${attachmentsHTML}</div>` : ''}
+        <div>${text}</div>
         <div class="asistr-message-time">${time}</div>
       </div>
     `
     
     messagesContainer.appendChild(messageDiv)
     messagesContainer.scrollTop = messagesContainer.scrollHeight
-  }
-
-  // Streaming mesajı güncelle
-  function updateStreamingMessage(text) {
-    const messagesContainer = document.getElementById('asistr-messages');
-    let streamingDiv = document.getElementById('asistr-streaming-message');
-    
-    if (!streamingDiv) {
-      streamingDiv = document.createElement('div');
-      streamingDiv.id = 'asistr-streaming-message';
-      streamingDiv.className = 'asistr-message agent';
-      messagesContainer.appendChild(streamingDiv);
-    }
-
-    const now = new Date();
-    const time = now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
-    const messageContent = parseMarkdown(text);
-
-    streamingDiv.innerHTML = `
-      <div class="asistr-message-bubble">
-        <div>${messageContent}</div>
-        <span style="display: inline-block; width: 2px; height: 16px; background: currentColor; animation: blink 1s infinite; margin-left: 2px;"></span>
-        <div class="asistr-message-time">${time}</div>
-      </div>
-    `;
-
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
   }
 
   function showTyping() {

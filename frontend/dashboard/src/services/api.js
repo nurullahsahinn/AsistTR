@@ -58,18 +58,34 @@ export const authApi = {
 
 // Chat API
 export const chatApi = {
-  getConversations: (params) =>
-    api.get('/chat', { params }),
-  
-  getMessages: (conversationId) =>
-    api.get(`/chat/${conversationId}/messages`),
-  
-  closeConversation: (conversationId, rating) =>
-    api.post(`/chat/${conversationId}/close`, { rating }),
-  
-  assignAgent: (conversationId, agentId) =>
-    api.post(`/chat/${conversationId}/assign`, { agentId }),
-}
+  // Konuşmaları listele
+  getConversations: (params) => api.get('/chat', { params }),
+  // Mesajları getir
+  getMessages: (conversationId) => api.get(`/chat/${conversationId}/messages`),
+  // Konuşmayı kapat
+  closeConversation: (conversationId, rating) => api.post(`/chat/${conversationId}/close`, { rating }),
+  // Agent ata
+  assignAgent: (conversationId, agentId) => api.post(`/chat/${conversationId}/assign`, { agentId }),
+  // Konuşmayı sil (Admin)
+  deleteConversation: (conversationId) => api.delete(`/chat/${conversationId}`),
+  // Dosya Yükle
+  uploadFile: (formData) => api.post('/upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  }),
+};
+
+export const userApi = {
+  // Kullanıcıları listele (Admin)
+  listUsers: () => api.get('/users'),
+  // Yeni kullanıcı oluştur (Admin)
+  createUser: (userData) => api.post('/users', userData),
+  // Kullanıcıyı güncelle (Admin)
+  updateUser: (userId, userData) => api.put(`/users/${userId}`, userData),
+  // Kullanıcıyı sil (Admin)
+  deleteUser: (userId) => api.delete(`/users/${userId}`),
+};
 
 // Widget/Site API
 export const siteApi = {
@@ -111,5 +127,6 @@ export const ragApi = {
 }
 
 export default api
+
 
 

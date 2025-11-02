@@ -13,27 +13,21 @@ import SettingsPage from './pages/SettingsPage'
 // Layout
 import DashboardLayout from './components/DashboardLayout'
 
-function PrivateRoute({ children }) {
-  const { token } = useAuthStore()
-  return token ? children : <Navigate to="/login" />
-}
-
 function App() {
+  const { token } = useAuthStore()
+
   return (
     <>
+      <Toaster position="bottom-right" />
       <BrowserRouter>
         <Routes>
-          {/* Public Routes */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
-
-          {/* Private Routes */}
-          <Route
-            path="/"
+          
+          <Route 
+            path="/*"
             element={
-              <PrivateRoute>
-                <DashboardLayout />
-              </PrivateRoute>
+              token ? <DashboardLayout /> : <Navigate to="/login" />
             }
           >
             <Route index element={<DashboardPage />} />
@@ -41,26 +35,13 @@ function App() {
             <Route path="knowledge" element={<KnowledgePage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
-
-          {/* 404 */}
-          <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </BrowserRouter>
-
-      <Toaster 
-        position="top-right"
-        toastOptions={{
-          duration: 3000,
-          style: {
-            background: '#363636',
-            color: '#fff',
-          },
-        }}
-      />
     </>
   )
 }
 
 export default App
+
 
 

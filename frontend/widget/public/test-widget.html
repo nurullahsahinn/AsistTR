@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AsistTR Widget Test Sayfası</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #1f2937;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+
+        .subtitle {
+            color: #6b7280;
+            margin-bottom: 30px;
+        }
+
+        .feature {
+            background: #f9fafb;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .feature-icon {
+            font-size: 24px;
+        }
+
+        .feature-text {
+            flex: 1;
+        }
+
+        .feature-title {
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 4px;
+        }
+
+        .feature-desc {
+            font-size: 14px;
+            color: #6b7280;
+        }
+
+        .info-box {
+            background: #eff6ff;
+            border-left: 4px solid #0284c7;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 30px;
+        }
+
+        .info-box p {
+            color: #0369a1;
+            font-size: 14px;
+            margin: 5px 0;
+        }
+
+        .widget-info {
+            background: #f0fdf4;
+            border-left: 4px solid #10b981;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .widget-info h3 {
+            color: #059669;
+            margin-bottom: 8px;
+        }
+
+        .widget-info p {
+            color: #047857;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎉 AsistTR Widget Test</h1>
+        <p class="subtitle">Sağ alt köşedeki widget ikonuna tıklayarak test başlatın!</p>
+
+        <div class="feature">
+            <div class="feature-icon">💬</div>
+            <div class="feature-text">
+                <div class="feature-title">Canlı Sohbet</div>
+                <div class="feature-desc">Anında yanıt veren akıllı asistan</div>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="feature-icon">📎</div>
+            <div class="feature-text">
+                <div class="feature-title">Dosya Desteği</div>
+                <div class="feature-desc">Resim ve belgeler gönderebilirsiniz</div>
+            </div>
+        </div>
+
+        <div class="feature">
+            <div class="feature-icon">🤖</div>
+            <div class="feature-text">
+                <div class="feature-title">Yapay Zeka</div>
+                <div class="feature-desc">Akıllı cevaplar ve otomatik yanıtlar</div>
+            </div>
+        </div>
+
+        <div class="info-box">
+            <p><strong>ℹ️ Not:</strong> Widget'ı test etmek için önce adınızı girmeniz gerekmektedir.</p>
+            <p><strong>API Key:</strong> <code>demo_qx14bqf4t5</code> (Demo E-Ticaret site)</p>
+            <p><strong>Backend URL:</strong> http://localhost:4000</p>
+            <p><strong>Widget URL:</strong> http://localhost:5173/widget.js</p>
+        </div>
+
+        <div class="widget-info">
+            <h3>✅ Widget Yükleme Durumu</h3>
+            <p id="widget-status">Yükleniyor... Sağ alt köşedeki mavi baloncuk şeklindeki ikona tıklayarak sohbete başlayabilirsiniz.</p>
+        </div>
+    </div>
+
+    <!-- Widget Config (API Key) -->
+    <script>
+        window.AsistTRConfig = {
+            apiKey: 'demo_qx14bqf4t5', // Valid API key from database - Demo E-Ticaret site
+            apiUrl: 'http://localhost:4000',
+            socketUrl: 'ws://localhost:4000'
+        }
+    </script>
+
+    <!-- Widget Script -->
+    <script src="http://localhost:5173/widget.js"></script>
+    <script>
+        // Widget yükleme kontrolü
+        setTimeout(() => {
+            const widget = document.querySelector('#asistr-widget');
+            const statusEl = document.getElementById('widget-status');
+            
+            if (widget) {
+                statusEl.innerHTML = '<strong>✅ Widget Başarıyla Yüklendi!</strong> Sağ alt köşedeki mavi baloncuk şeklindeki ikona tıklayarak sohbete başlayabilirsiniz.';
+                statusEl.style.color = '#059669';
+                console.log('✅ Widget başarıyla yüklendi');
+            } else {
+                statusEl.innerHTML = '<strong>❌ Widget Yüklenemedi!</strong> Lütfen console\'u kontrol edin.';
+                statusEl.style.color = '#dc2626';
+                console.error('❌ Widget element bulunamadı');
+            }
+            
+            // API Key kontrolü
+            if (window.AsistTRConfig && window.AsistTRConfig.apiKey) {
+                console.log('✅ API Key:', window.AsistTRConfig.apiKey);
+            } else {
+                console.error('❌ API Key bulunamadı!');
+            }
+        }, 3000);
+    </script>
+</body>
+</html>

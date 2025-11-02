@@ -17,16 +17,26 @@ async function addKnowledge(siteId, title, content, metadata = {}) {
     
     if (!embedding) {
       logger.warn('Embedding oluşturulamadı, sadece metin kaydediliyor');
+      // Embedding olmadan kaydet
+      const result = await query(
+        `INSERT INTO knowledge_base (site_id, title, content, metadata, is_active)
+         VALUES ($1, $2, $3, $4, true)
+         RETURNING *`,
+        [siteId, title, content, JSON.stringify(metadata)]
+      );
+      logger.info(`Bilgi tabanına eklendi (embedding olmadan): ${title}`);
+      return result.rows[0];
     }
     
+    // Embedding ile kaydet
     const result = await query(
-      `INSERT INTO knowledge_base (site_id, title, content, metadata, is_active)
-       VALUES ($1, $2, $3, $4, true)
+      `INSERT INTO knowledge_base (site_id, title, content, embedding, metadata, is_active)
+       VALUES ($1, $2, $3, $4, $5, true)
        RETURNING *`,
-      [siteId, title, content, JSON.stringify(metadata)]
+      [siteId, title, content, JSON.stringify(embedding), JSON.stringify(metadata)]
     );
     
-    logger.info(`Bilgi tabanına eklendi: ${title}`);
+    logger.info(`Bilgi tabanına eklendi (embedding ile): ${title}`);
     return result.rows[0];
     
   } catch (error) {
@@ -73,34 +83,115 @@ async function getKnowledge(id) {
 }
 
 /**
- * İlgili bilgileri ara (basit metin araması)
- * Not: Gelişmiş vector search için pgvector extension gerekir
+ * İlgili bilgileri ara (hybrid search: text + vector birleşik)
  */
 async function searchKnowledge(siteId, searchQuery, limit = 3) {
   try {
-    // Basit metin araması (ILIKE ile)
-    const result = await query(
-      `SELECT id, title, content, metadata
-       FROM knowledge_base
-       WHERE site_id = $1 
-       AND is_active = true
-       AND (
-         title ILIKE $2 
-         OR content ILIKE $2
-       )
-       ORDER BY 
-         CASE 
-           WHEN title ILIKE $2 THEN 1
-           ELSE 2
-         END,
-         created_at DESC
-       LIMIT $3`,
-      [siteId, `%${searchQuery}%`, limit]
-    );
+    logger.info(`Arama başlatılıyor: "${searchQuery}"`);
     
-    return result.rows;
+    // 1. Text-based search yap
+    const textResults = await textBasedSearch(siteId, searchQuery, limit);
+    logger.info(`Text search: ${textResults.length} sonuç`);
+    
+    // 2. Vector search yap (eğer embedding oluşturulabilirse)
+    let vectorResults = [];
+    const queryEmbedding = await generateEmbedding(searchQuery);
+    
+    if (queryEmbedding) {
+      const result = await query(
+        `SELECT 
+           id, 
+           title, 
+           content, 
+           metadata,
+           1 - (embedding <=> $1::vector) as similarity
+         FROM knowledge_base
+         WHERE site_id = $2 
+         AND is_active = true
+         AND embedding IS NOT NULL
+         ORDER BY embedding <=> $1::vector
+         LIMIT $3`,
+        [JSON.stringify(queryEmbedding), siteId, limit]
+      );
+      vectorResults = result.rows;
+      logger.info(`Vector search: ${vectorResults.length} sonuç`);
+    } else {
+      logger.warn('Embedding oluşturulamadı, sadece text search kullanılıyor');
+    }
+    
+    // 3. Sonuçları birleştir (text öncelikli, sonra vector)
+    if (textResults.length > 0) {
+      // Text search sonuç bulduysa bunu kullan (çünkü Türkçe için daha güvenilir)
+      logger.info(`Text search ile ${textResults.length} sonuç döndürülüyor`);
+      return textResults;
+    }
+    
+    if (vectorResults.length > 0) {
+      // Text bulamadıysa vector kullan
+      logger.info(`Vector search ile ${vectorResults.length} sonuç döndürülüyor`);
+      return vectorResults;
+    }
+    
+    // Hiçbir sonuç yok
+    logger.warn('Hiçbir sonuç bulunamadı');
+    return [];
+    
   } catch (error) {
     logger.error('SearchKnowledge hatası:', error);
+    return [];
+  }
+}
+
+/**
+ * Text-based search (Türkçe için optimize edilmiş)
+ */
+async function textBasedSearch(siteId, searchQuery, limit = 3) {
+  try {
+    // Anahtar kelimeleri çıkart
+    const keywords = searchQuery
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(word => word.length > 2); // 2 karakterden uzun kelimeler
+    
+    if (keywords.length === 0) {
+      return [];
+    }
+    
+    // Her kelime için ILIKE pattern oluştur
+    const patterns = keywords.map(k => `%${k}%`);
+    
+    // Çoklu kelime arama - herhangi biri eşleşirse
+    const whereConditions = keywords.map((_, idx) => 
+      `(title ILIKE $${idx + 3} OR content ILIKE $${idx + 3})`
+    ).join(' OR ');
+    
+    // Skor hesaplama: Her kelime eşleşmesi için puan
+    const scoreCalculations = keywords.map((_, idx) => {
+      return `
+        CASE WHEN title ILIKE $${idx + 3} THEN 10 ELSE 0 END +
+        CASE WHEN content ILIKE $${idx + 3} THEN 3 ELSE 0 END
+      `;
+    }).join(' + ');
+    
+    const sql = `
+      SELECT id, title, content, metadata,
+        (${scoreCalculations}) as relevance_score
+      FROM knowledge_base
+      WHERE site_id = $1 
+        AND is_active = true
+        AND (${whereConditions})
+      ORDER BY relevance_score DESC, created_at DESC
+      LIMIT $2
+    `;
+    
+    const params = [siteId, limit, ...patterns];
+    const result = await query(sql, params);
+    
+    logger.info(`Text search sonuç: ${result.rows.length} eşleşme bulundu`);
+    return result.rows;
+    
+  } catch (error) {
+    logger.error('TextBasedSearch hatası:', error);
     return [];
   }
 }

@@ -52,7 +52,7 @@ class SocketService {
   }
 
   // Mesaj gönder
-  sendMessage(conversationId, body) {
+  sendMessage(conversationId, body, attachments = null) {
     if (!this.socket?.connected) {
       console.error('Socket bağlı değil')
       return
@@ -61,7 +61,8 @@ class SocketService {
     this.socket.emit('message:send', {
       conversationId,
       body,
-      senderType: 'agent'
+      senderType: 'agent',
+      attachments
     })
   }
 
@@ -104,5 +105,7 @@ class SocketService {
 const socketService = new SocketService()
 
 export default socketService
+
+
 
 

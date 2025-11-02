@@ -5,7 +5,7 @@
 
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
-import { FiMessageSquare, FiBook, FiSettings, FiLogOut, FiHome } from 'react-icons/fi'
+import { FiMessageSquare, FiBook, FiSettings, FiLogOut, FiHome, FiUsers } from 'react-icons/fi'
 
 function DashboardLayout() {
   const { user, logout } = useAuthStore()
@@ -17,12 +17,18 @@ function DashboardLayout() {
     navigate('/login')
   }
 
-  const menuItems = [
+  let menuItems = [
     { path: '/', icon: FiHome, label: 'Ana Sayfa' },
     { path: '/chat', icon: FiMessageSquare, label: 'Sohbetler' },
-    { path: '/knowledge', icon: FiBook, label: 'Bilgi Tabanı' },
-    { path: '/settings', icon: FiSettings, label: 'Ayarlar' },
-  ]
+  ];
+
+  if (user?.role === 'admin') {
+    menuItems.push(
+      { path: '/knowledge', icon: FiBook, label: 'Bilgi Tabanı' },
+      { path: '/users', icon: FiUsers, label: 'Kullanıcılar' },
+      { path: '/settings', icon: FiSettings, label: 'Ayarlar' }
+    );
+  }
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -83,5 +89,6 @@ function DashboardLayout() {
 }
 
 export default DashboardLayout
+
 
 

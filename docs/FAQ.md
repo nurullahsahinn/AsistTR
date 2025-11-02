@@ -267,3 +267,5 @@ Evet, tamamen özelleştirebilirsiniz.
 Başka sorunuz mu var? GitHub'da issue açın veya dokümantasyonu kontrol edin! 🚀
 
 
+
+

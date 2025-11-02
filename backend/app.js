@@ -12,6 +12,14 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const { Server } = require('socket.io');
+const path = require('path');
+
+// Kritik environment variable kontrolleri
+if (!process.env.JWT_SECRET) {
+  console.error('❌ HATA: JWT_SECRET environment variable tanımlı değil!');
+  console.error('İpucu: .env dosyasında JWT_SECRET=güçlü-bir-secret-anahtar ekleyin');
+  process.exit(1);
+}
 
 // Utils
 const logger = require('./src/utils/logger');
@@ -31,23 +39,49 @@ const socketHandler = require('./src/socket/socket.handler');
 const app = express();
 const server = http.createServer(app);
 
+// CORS ayarları - Güvenlik için whitelist
+const allowedOrigins = process.env.CORS_ORIGIN?.split(',') || [
+  'http://localhost:3000',
+  'http://localhost:5173'
+];
+
 // Socket.IO kur
 const io = new Server(server, {
   cors: {
-    origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000'],
-    credentials: true
-  }
+    origin: allowedOrigins,
+    credentials: true,
+    methods: ['GET', 'POST']
+  },
+  pingTimeout: 60000,
+  pingInterval: 25000
 });
 
 // Middleware'ler
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: process.env.NODE_ENV === 'production',
+  crossOriginEmbedderPolicy: false
+}));
+
 app.use(cors({
-  origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000'],
+  origin: (origin, callback) => {
+    // Origin yoksa izin ver (mobile apps, Postman vb.)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.includes('*')) {
+      callback(null, true);
+    } else {
+      logger.warn(`CORS hatası: İzinli olmayan origin: ${origin}`);
+      callback(new Error('CORS policy tarafından izin verilmedi'));
+    }
+  },
   credentials: true
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('combined', { stream: logger.stream }));
+
+// Yüklenen dosyaları public olarak sun
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -83,6 +117,9 @@ io.on('connection', (socket) => {
   socketHandler(io, socket);
 });
 
+// io objesini global olarak sakla (controller'lardan erişim için)
+global.socketIO = io;
+
 // Sunucuyu başlat
 const PORT = process.env.PORT || 4000;
 
@@ -95,12 +132,27 @@ async function startServer() {
     // Redis bağlantısı
     await connectRedis();
     logger.info('✅ Redis bağlantısı başarılı');
+    
+    // Ollama health check (opsiyonel)
+    try {
+      const { healthCheck } = require('./src/rag/ollama.service');
+      const ollamaHealthy = await healthCheck();
+      if (ollamaHealthy) {
+        logger.info('✅ Ollama servisi hazır');
+      } else {
+        logger.warn('⚠️ Ollama servisi erişilemiyor - AI yanıtlar devre dışı');
+      }
+    } catch (err) {
+      logger.warn('⚠️ Ollama health check atlandı:', err.message);
+    }
 
     // Sunucu dinlemeye başla
     server.listen(PORT, () => {
       logger.info(`🚀 AsistTR Backend ${PORT} portunda çalışıyor`);
       logger.info(`📡 WebSocket sunucusu aktif`);
       logger.info(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+      logger.info(`🔒 JWT Secret: ${process.env.JWT_SECRET ? '✅ Tanımlı' : '❌ Eksik'}`);
+      logger.info(`🌐 CORS Origins: ${allowedOrigins.join(', ')}`);
     });
 
   } catch (error) {
@@ -121,5 +173,6 @@ process.on('SIGTERM', () => {
 });
 
 module.exports = { app, io };
+
 
 
