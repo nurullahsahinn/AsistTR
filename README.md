@@ -570,10 +570,7 @@ Bu yazılımı kullanmak, kopyalamak, dağıtmak veya değiştirmek için **aç�
 - ❌ Reverse engineering
 - ❌ Rekabet eden ürün veya hizmet geliştirme
 
-**İzin Verilen Kullanımlar:**
-- ✅ Akademik araştırma ve eğitim (uygun atıf ile)
-- ✅ Kişisel öğrenme ve deneme
-- ✅ Yazılı izin ile ticari kullanım
+
 
 ### 📧 Lisans Talebi
 
@@ -618,5 +615,6 @@ Bu proje **tawk.to benzeri** yerli ve milli bir canlı destek platformudur. Teme
 ---
 **Not**: Bu proje aktif geliştirme aşamasındadır. MVP özellikleri tamamlandıkça güncellenecektir.
 **Geliştirici**: Nurullah Şahin - Bitirme Projesi 2025
+
 
 
