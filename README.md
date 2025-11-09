@@ -158,8 +158,173 @@ AsistTR/
 - Docker Compose 2.20+
 - 8GB RAM (minimum)
 - 20GB Disk Alanı
+- Ollama model indirmesi için internet bağlantısı (ilk kurulum)
 
+### Kurulum Adımları
 
+1. **Repository'yi klonlayın**
+```bash
+git clone https://github.com/nurullahsahinn/AsistTR.git
+cd AsistTR
+```
+
+2. **Environment variables'ı ayarlayın**
+```bash
+# .env dosyası oluşturun (backend/.env)
+cp backend/.env.example backend/.env
+# JWT_SECRET ve diğer güvenlik ayarlarını düzenleyin
+```
+
+3. **Docker container'ları başlatın**
+```bash
+docker-compose up -d
+```
+
+4. **Ollama modelini yükleyin** (ÖNEMLİ!)
+```bash
+# Ollama container'ına bağlanın
+docker exec -it asistr_ollama ollama pull llama3.1:8b
+
+# Embedding modelini yükleyin
+docker exec -it asistr_ollama ollama pull nomic-embed-text:latest
+
+# Model listesini kontrol edin
+docker exec -it asistr_ollama ollama list
+```
+
+5. **Veritabanı migration'larını çalıştırın**
+```bash
+docker exec -i asistr_backend node src/utils/migrate.js
+```
+
+6. **Vector index'ini oluşturun**
+```bash
+docker exec -i asistr_backend node src/utils/create-vector-index.js
+```
+
+7. **İlk admin kullanıcısını oluşturun**
+```bash
+# Backend container'ına bağlanın
+docker exec -it asistr_backend sh
+
+# Seed script'i çalıştırın (opsiyonel)
+node src/utils/seed.js
+```
+
+8. **Servisleri kontrol edin**
+```bash
+# Tüm container'ların çalıştığını kontrol edin
+docker ps
+
+# Backend loglarını kontrol edin
+docker logs -f asistr_backend
+
+# Ollama servisini test edin
+curl http://localhost:11434/api/tags
+```
+
+### Ollama Kullanımı
+
+#### Model Yönetimi
+
+```bash
+# Mevcut modelleri listele
+docker exec -it asistr_ollama ollama list
+
+# Yeni model yükle
+docker exec -it asistr_ollama ollama pull llama3.1:8b
+
+# Model sil
+docker exec -it asistr_ollama ollama rm llama3.1:8b
+
+# Model bilgilerini görüntüle
+docker exec -it asistr_ollama ollama show llama3.1:8b
+```
+
+#### Model Test Etme
+
+```bash
+# Ollama ile direkt konuşma testi
+docker exec -it asistr_ollama ollama run llama3.1:8b "Merhaba, nasılsın?"
+
+# API ile test
+curl http://localhost:11434/api/generate -d '{
+  "model": "llama3.1:8b",
+  "prompt": "Türkiye\'nin başkenti neresidir?",
+  "stream": false
+}'
+```
+
+#### Model Güncelleme
+
+```bash
+# Modeli güncelle
+docker exec -it asistr_ollama ollama pull llama3.1:8b
+
+# Backend'i yeniden başlat (model değişiklikleri için)
+docker-compose restart backend
+```
+
+#### Ollama Ayarları
+
+Backend'de Ollama ayarlarını değiştirmek için `backend/.env` dosyasını düzenleyin:
+
+```env
+# Ollama Base URL (varsayılan: http://ollama:11434)
+OLLAMA_BASE_URL=http://ollama:11434
+
+# Kullanılacak LLM modeli
+OLLAMA_MODEL=llama3.1:8b
+
+# Embedding modeli
+OLLAMA_EMBED_MODEL=nomic-embed-text:latest
+
+# Model parametreleri (opsiyonel)
+OLLAMA_TEMPERATURE=0.1
+OLLAMA_MAX_TOKENS=2000
+```
+
+#### Ollama Sorun Giderme
+
+```bash
+# Ollama container loglarını kontrol et
+docker logs -f asistr_ollama
+
+# Ollama servis durumunu kontrol et
+docker exec -it asistr_ollama curl http://localhost:11434/api/tags
+
+# Ollama'yı yeniden başlat
+docker-compose restart ollama
+
+# Ollama verilerini temizle (dikkatli kullanın!)
+docker-compose down
+docker volume rm asistr_ollama_data
+docker-compose up -d
+# Modeli tekrar yükleyin
+```
+
+#### Performans Optimizasyonu
+
+Ollama performansını artırmak için:
+
+1. **GPU Desteği** (NVIDIA GPU varsa):
+```yaml
+# docker-compose.yml'de ollama servisine ekle:
+deploy:
+  resources:
+    reservations:
+      devices:
+        - driver: nvidia
+          count: 1
+          capabilities: [gpu]
+```
+
+2. **Model Boyutu**: Daha küçük modeller daha hızlı çalışır:
+   - `llama3.1:8b` - Dengeli (önerilen)
+   - `llama3.1:3b` - Daha hızlı, daha az doğru
+   - `llama3.1:70b` - Daha yavaş, daha doğru
+
+3. **RAM Ayarları**: Ollama için yeterli RAM ayırın (minimum 8GB)
 
 
 ## 📖 Kullanım
@@ -386,9 +551,45 @@ CREATE INDEX idx_visitors_session ON visitors(site_id, session_id);
 ---
 
 
-## 📄 Lisans
+## 📄 Lisans ve Telif Hakkı
 
-MIT License
+### ⚠️ ÖNEMLİ: Proprietary License
+
+Bu proje **proprietary (tüm hakları saklı)** bir lisans altındadır.
+
+**Copyright (c) 2025 Nurullah Şahin. All rights reserved.**
+
+### 🔒 Kullanım Kısıtlamaları
+
+Bu yazılımı kullanmak, kopyalamak, dağıtmak veya değiştirmek için **açık yazılı izin** gereklidir.
+
+**Yasaklanan Kullanımlar:**
+- ❌ Ticari kullanım (izin olmadan)
+- ❌ Kodu kopyalama veya dağıtma
+- ❌ Kodu değiştirme veya türev eser oluşturma
+- ❌ Reverse engineering
+- ❌ Rekabet eden ürün veya hizmet geliştirme
+
+**İzin Verilen Kullanımlar:**
+- ✅ Akademik araştırma ve eğitim (uygun atıf ile)
+- ✅ Kişisel öğrenme ve deneme
+- ✅ Yazılı izin ile ticari kullanım
+
+### 📧 Lisans Talebi
+
+Ticari kullanım veya özel lisans için lütfen iletişime geçin:
+- **Email**: nurullahsahin0088@gmail.com
+- **Konu**: AsistTR License Request
+
+### 📋 Alternatif Lisanslar
+
+- **AGPL-3.0**: Açık kaynak kullanım için `LICENSE.AGPL-3.0` dosyasına bakın
+- **Commercial License**: Ticari kullanım için özel lisans anlaşması gerekir
+
+### 🔍 Detaylar
+
+Tam lisans metni için `LICENSE` dosyasına bakın.
+Telif hakkı bildirimi için `COPYRIGHT` dosyasına bakın.
 
 ---
 
