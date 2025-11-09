@@ -126,6 +126,71 @@ export const ragApi = {
     api.get('/rag/health'),
 }
 
+// Voice Call API
+export const voiceApi = {
+  updateCallAvailability: (availableForCalls, maxConcurrentCalls = 1) =>
+    api.post('/voice/availability', { availableForCalls, maxConcurrentCalls }),
+  
+  acceptCall: (voiceCallId) =>
+    api.post(`/voice/${voiceCallId}/accept`),
+  
+  rejectCall: (voiceCallId) =>
+    api.post(`/voice/${voiceCallId}/reject`),
+  
+  endCall: (voiceCallId, reason = 'user_hangup') =>
+    api.post(`/voice/${voiceCallId}/end`, { reason }),
+  
+  getActiveCalls: (siteId) =>
+    api.get('/voice/active', { params: { siteId } }),
+}
+
+// Canned Responses API
+export const cannedApi = {
+  getCannedResponses: (params) => api.get('/canned', { params }),
+  createCannedResponse: (data) => api.post('/canned', data),
+  updateCannedResponse: (id, data) => api.put(`/canned/${id}`, data),
+  deleteCannedResponse: (id) => api.delete(`/canned/${id}`),
+}
+
+// Analytics API
+export const analyticsApi = {
+  getDashboard: (params) => api.get('/analytics/dashboard', { params }),
+  getTopPages: (params) => api.get('/analytics/top-pages', { params }),
+  getTrafficSources: (params) => api.get('/analytics/traffic-sources', { params }),
+  getDeviceStats: (params) => api.get('/analytics/device-stats', { params }),
+  getConversationMetrics: (params) => api.get('/analytics/conversation-metrics', { params }),
+  getAgentPerformance: (params) => api.get('/analytics/agent-performance', { params }),
+}
+
+// Departments API
+export const departmentApi = {
+  getDepartments: () => api.get('/departments'),
+  createDepartment: (data) => api.post('/departments', data),
+  updateDepartment: (id, data) => api.put(`/departments/${id}`, data),
+  deleteDepartment: (id) => api.delete(`/departments/${id}`),
+}
+
+// Agents API
+export const agentApi = {
+  getAgents: (params) => api.get('/agents', { params }),
+  createAgent: (data) => api.post('/agents', data),
+  updateAgent: (id, data) => api.put(`/agents/${id}`, data),
+  deleteAgent: (id) => api.delete(`/agents/${id}`),
+  updateStatus: (status) => api.post('/agents/status', { status }),
+  getPresence: () => api.get('/agents/presence'),
+}
+
+// Notifications API
+export const notificationApi = {
+  getPreferences: () => api.get('/notifications/preferences'),
+  updatePreferences: (preferences) => api.put('/notifications/preferences', preferences),
+  getNotifications: (params) => api.get('/notifications', { params }),
+  markAsRead: (notificationId) => api.put(`/notifications/${notificationId}/read`),
+  markAllAsRead: () => api.put('/notifications/read-all'),
+}
+
+// Export both named and default
+export { api }
 export default api
 
 

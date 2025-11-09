@@ -66,6 +66,20 @@ class SocketService {
     })
   }
 
+  // Conversation'a katıl (agent room'a join)
+  joinConversation(conversationId, agentId) {
+    if (!this.socket?.connected) {
+      console.error('Socket bağlı değil')
+      return
+    }
+
+    this.socket.emit('agent:join:conversation', {
+      conversationId,
+      agentId
+    })
+    console.log(`✅ Agent conversation'a katıldı: ${conversationId}`)
+  }
+
   // Yazıyor bildirimi
   startTyping(conversationId) {
     if (this.socket?.connected) {

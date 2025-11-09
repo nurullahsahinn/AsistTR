@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "AsistTR Chat Widget",
   "private": true,
+  "author": "Nurullah Şahin",
+  "license": "PROPRIETARY",
+  "copyright": "Copyright (c) 2025 Nurullah Şahin. All rights reserved.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

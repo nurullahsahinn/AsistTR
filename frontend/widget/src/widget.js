@@ -28,12 +28,38 @@ import { io } from 'socket.io-client'
     localStorage.setItem('asistr_session_id', sessionId)
   }
 
+  // Track page view on load
+  trackPageView();
+  
+  // Track page view on navigation (for SPAs)
+  let lastUrl = location.href;
+  new MutationObserver(() => {
+    const currentUrl = location.href;
+    if (currentUrl !== lastUrl) {
+      lastUrl = currentUrl;
+      trackPageView();
+    }
+  }).observe(document, { subtree: true, childList: true });
+
   let socket = null
   let conversationId = null
   let visitorId = null
   let isOpen = false
   let isUploading = false;
   let streamingMessage = ''; // Streaming mesaj
+  
+  // Voice call state
+  let voiceCallId = null;
+  let peerConnection = null;
+  let localStream = null;
+  let isInCall = false;
+  let callStatus = 'idle'; // idle, calling, ringing, connected, ended
+  
+  // Proactive chat triggers
+  let triggeredMessages = new Set(); // Zaten tetiklenen mesajları sakla
+  let scrollTriggered = false;
+  let exitIntentTriggered = false;
+  let pageVisitTriggered = false;
 
   // Markdown parser
   function parseMarkdown(text) {
@@ -472,10 +498,163 @@ import { io } from 'socket.io-client'
       }
       #asistr-attach-btn:disabled { cursor: not-allowed; opacity: 0.5; }
 
+      #asistr-voice-btn {
+        width: 44px;
+        height: 44px;
+        background: transparent;
+        border: none;
+        color: #6b7280;
+        cursor: pointer !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+      #asistr-voice-btn:hover { 
+        color: #10b981; 
+        background: rgba(16, 185, 129, 0.1);
+        transform: scale(1.05);
+      }
+      #asistr-voice-btn.calling {
+        color: #ef4444;
+        background: rgba(239, 68, 68, 0.1);
+        animation: pulse 1.5s ease-in-out infinite;
+      }
+      #asistr-voice-btn.in-call {
+        color: #10b981;
+        background: rgba(16, 185, 129, 0.2);
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
+
+      .asistr-call-status {
+        background: #f0fdf4;
+        border: 1px solid #86efac;
+        color: #166534;
+        padding: 8px 12px;
+        border-radius: 8px;
+        font-size: 13px;
+        text-align: center;
+        margin: 8px 16px;
+      }
+      .asistr-call-status.ringing {
+        background: #fef3c7;
+        border-color: #fcd34d;
+        color: #92400e;
+      }
+      .asistr-call-status.connected {
+        background: #d1fae5;
+        border-color: #6ee7b7;
+        color: #065f46;
+      }
+
       .hidden { display: none !important; }
 
       .asistr-attachment-image { max-width: 100%; max-height: 150px; border-radius: 8px; margin-top: 5px; }
       .asistr-attachment-link { display: flex; align-items: center; gap: 8px; background: #f3f4f6; padding: 8px; border-radius: 8px; color: #1f2937; text-decoration: none; margin-top: 5px; }
+      
+      /* Rating Modal */
+      #asistr-rating-modal {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+      }
+      #asistr-rating-modal.show { display: flex; }
+      
+      .asistr-rating-content {
+        background: white;
+        padding: 24px;
+        border-radius: 16px;
+        width: 90%;
+        max-width: 320px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      }
+      
+      .asistr-rating-title {
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 16px;
+        color: #1f2937;
+        text-align: center;
+      }
+      
+      .asistr-stars {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+        margin-bottom: 16px;
+      }
+      
+      .asistr-star {
+        font-size: 32px;
+        cursor: pointer;
+        color: #d1d5db;
+        transition: all 0.2s;
+      }
+      
+      .asistr-star:hover,
+      .asistr-star.active {
+        color: #fbbf24;
+        transform: scale(1.1);
+      }
+      
+      .asistr-feedback-input {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 14px;
+        font-family: inherit;
+        resize: vertical;
+        min-height: 60px;
+        margin-bottom: 16px;
+      }
+      
+      .asistr-rating-buttons {
+        display: flex;
+        gap: 8px;
+      }
+      
+      .asistr-rating-btn {
+        flex: 1;
+        padding: 10px;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      
+      .asistr-rating-btn.submit {
+        background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+        color: white;
+      }
+      
+      .asistr-rating-btn.submit:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4);
+      }
+      
+      .asistr-rating-btn.skip {
+        background: #f3f4f6;
+        color: #6b7280;
+      }
+      
+      .asistr-rating-btn.skip:hover {
+        background: #e5e7eb;
+      }
 
     </style>
 
@@ -511,7 +690,16 @@ import { io } from 'socket.io-client'
 
         <!-- Input Area -->
         <div id="asistr-input-area">
+          <div id="asistr-call-status" class="asistr-call-status" style="display: none;"></div>
           <form id="asistr-input-form">
+            <button type="button" id="asistr-voice-btn" title="Sesli Arama">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                <line x1="12" y1="19" x2="12" y2="23"></line>
+                <line x1="8" y1="23" x2="16" y2="23"></line>
+              </svg>
+            </button>
             <button type="button" id="asistr-attach-btn">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
             </button>
@@ -527,6 +715,29 @@ import { io } from 'socket.io-client'
               </svg>
             </button>
           </form>
+        </div>
+        
+        <!-- Rating Modal -->
+        <div id="asistr-rating-modal">
+          <div class="asistr-rating-content">
+            <div class="asistr-rating-title">Sohbeti değerlendirin</div>
+            <div class="asistr-stars">
+              <span class="asistr-star" data-rating="1">★</span>
+              <span class="asistr-star" data-rating="2">★</span>
+              <span class="asistr-star" data-rating="3">★</span>
+              <span class="asistr-star" data-rating="4">★</span>
+              <span class="asistr-star" data-rating="5">★</span>
+            </div>
+            <textarea 
+              id="asistr-feedback" 
+              class="asistr-feedback-input" 
+              placeholder="Geri bildiriminiz (opsiyonel)"
+            ></textarea>
+            <div class="asistr-rating-buttons">
+              <button class="asistr-rating-btn skip" id="asistr-rating-skip">Atla</button>
+              <button class="asistr-rating-btn submit" id="asistr-rating-submit">Gönder</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -547,6 +758,19 @@ import { io } from 'socket.io-client'
       document.getElementById('asistr-file-input').click();
     });
     document.getElementById('asistr-file-input').addEventListener('change', handleFileUpload);
+    document.getElementById('asistr-voice-btn').addEventListener('click', toggleVoiceCall);
+    
+    // Rating event listeners
+    const stars = document.querySelectorAll('.asistr-star');
+    stars.forEach(star => {
+      star.addEventListener('click', () => {
+        const rating = parseInt(star.getAttribute('data-rating'));
+        selectRating(rating);
+      });
+    });
+    
+    document.getElementById('asistr-rating-submit').addEventListener('click', submitRating);
+    document.getElementById('asistr-rating-skip').addEventListener('click', closeRatingModal);
     
     // Enter tuşu ile gönder ve auto-resize
     const messageInput = document.getElementById('asistr-message-input');
@@ -559,9 +783,25 @@ import { io } from 'socket.io-client'
     })
     
     // Auto-resize textarea
+    let typingTimeout;
     messageInput.addEventListener('input', function() {
       this.style.height = 'auto';
       this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+      
+      // Send typing indicator to agent
+      if (socket && conversationId) {
+        socket.emit('visitor:typing:start', { conversationId });
+        
+        // Clear previous timeout
+        clearTimeout(typingTimeout);
+        
+        // Stop typing after 2 seconds of inactivity
+        typingTimeout = setTimeout(() => {
+          if (socket && conversationId) {
+            socket.emit('visitor:typing:stop', { conversationId });
+          }
+        }, 2000);
+      }
     })
   }
 
@@ -571,6 +811,22 @@ import { io } from 'socket.io-client'
     
     if (isOpen) {
       chatWindow.classList.add('open')
+      
+      // ✅ Eğer kayıtlı conversation varsa direkt chat göster, form gösterme
+      const savedConversationId = localStorage.getItem('asistr_conversation_id')
+      const savedVisitorName = localStorage.getItem('asistr_visitor_name')
+      
+      if (savedConversationId && savedVisitorName) {
+        console.log('✅ Restoring previous session:', savedConversationId)
+        
+        // Form'u gizle, chat'i göster
+        document.getElementById('asistr-welcome-form').style.display = 'none'
+        document.getElementById('asistr-messages').classList.add('active')
+        document.getElementById('asistr-input-area').classList.add('active')
+        
+        // Socket bağlantısı kur (eski conversation'a bağlanacak)
+        connectSocket({ name: savedVisitorName, email: localStorage.getItem('asistr_visitor_email') || '' })
+      }
     } else {
       chatWindow.classList.remove('open')
     }
@@ -604,17 +860,43 @@ import { io } from 'socket.io-client'
     socket.on('connect', () => {
       console.log('Socket bağlandı:', socket.id)
       
+      // Önceki conversation'ı kontrol et
+      const savedConversationId = localStorage.getItem('asistr_conversation_id')
+      const savedVisitorId = localStorage.getItem('asistr_visitor_id')
+      
+      console.log('💾 Saved conversation:', savedConversationId)
+      
       socket.emit('visitor:connect', {
         apiKey: API_KEY,
         sessionId,
-        visitorInfo
+        visitorInfo,
+        resumeConversationId: savedConversationId, // Backend bunu kontrol edecek
+        resumeVisitorId: savedVisitorId
       })
     })
 
     socket.on('visitor:connected', (data) => {
       conversationId = data.conversationId
       visitorId = data.visitorId
-      console.log('Conversation başlatıldı:', conversationId)
+      
+      // LocalStorage'a kaydet (visitor name & email de kaydet)
+      localStorage.setItem('asistr_conversation_id', conversationId)
+      localStorage.setItem('asistr_visitor_id', visitorId)
+      if (visitorInfo?.name) {
+        localStorage.setItem('asistr_visitor_name', visitorInfo.name)
+      }
+      if (visitorInfo?.email) {
+        localStorage.setItem('asistr_visitor_email', visitorInfo.email)
+      }
+      
+      console.log('✅ Conversation:', data.isResumed ? 'RESUMED' : 'NEW', conversationId)
+      
+      // Eğer conversation resume edildiyse, eski mesajları yükle
+      if (data.isResumed && data.messages) {
+        data.messages.forEach(msg => {
+          addMessage(msg.sender_type === 'visitor' ? 'user' : 'agent', msg.body)
+        })
+      }
     })
 
     socket.on('message:received', (message) => {
@@ -643,9 +925,43 @@ import { io } from 'socket.io-client'
     socket.on('typing:stop', () => {
       hideTyping()
     })
+    
+    // Voice call events
+    socket.on('voice:call:accepted', async (data) => {
+      console.log('Agent çağrıyı kabul etti:', data);
+      callStatus = 'connecting';
+      updateCallUI();
+      
+      // Setup WebRTC connection
+      await setupPeerConnection();
+    });
+    
+    socket.on('voice:webrtc:answer', async (data) => {
+      console.log('WebRTC answer alındı');
+      if (peerConnection) {
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+        callStatus = 'connected';
+        updateCallUI();
+      }
+    });
+    
+    socket.on('voice:webrtc:ice-candidate', async (data) => {
+      console.log('ICE candidate alındı');
+      if (peerConnection && data.candidate) {
+        await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+      }
+    });
+    
+    socket.on('voice:call:ended', (data) => {
+      console.log('Çağrı sonlandırıldı:', data);
+      endVoiceCall();
+    });
 
     socket.on('disconnect', () => {
       console.log('Socket bağlantısı kesildi')
+      if (isInCall) {
+        endVoiceCall();
+      }
     })
   }
 
@@ -780,12 +1096,477 @@ import { io } from 'socket.io-client'
     }
   }
 
+  // ===== Voice Call Functions =====
+  
+  // WebRTC Configuration
+  const rtcConfig = {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' }
+    ]
+  };
+  
+  async function toggleVoiceCall() {
+    if (isInCall) {
+      // End call
+      await endVoiceCall();
+    } else {
+      // Start call
+      await startVoiceCall();
+    }
+  }
+  
+  async function startVoiceCall() {
+    try {
+      if (!conversationId || !visitorId) {
+        alert('Lütfen önce sohbet başlatın');
+        return;
+      }
+      
+      // Update UI
+      callStatus = 'calling';
+      updateCallUI();
+      
+      // Request microphone permission
+      localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      // Create voice call in backend
+      const response = await fetch(`${API_URL}/api/voice/initiate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId, visitorId })
+      });
+      
+      const data = await response.json();
+      voiceCallId = data.voiceCallId;
+      
+      isInCall = true;
+      callStatus = 'ringing';
+      updateCallUI();
+      
+      console.log('Sesli çağrı başlatıldı:', voiceCallId);
+      
+    } catch (error) {
+      console.error('Sesli çağrı başlatma hatası:', error);
+      alert('Çağrı başlatılamadı. Mikrofon erişimine izin verdiğinizden emin olun.');
+      await endVoiceCall();
+    }
+  }
+  
+  async function setupPeerConnection() {
+    try {
+      peerConnection = new RTCPeerConnection(rtcConfig);
+      
+      // Add local stream to peer connection
+      localStream.getTracks().forEach(track => {
+        peerConnection.addTrack(track, localStream);
+      });
+      
+      // Handle remote stream
+      peerConnection.ontrack = (event) => {
+        console.log('✅ Remote audio track received');
+        const remoteAudio = new Audio();
+        remoteAudio.srcObject = event.streams[0];
+        remoteAudio.play();
+        
+        // ✅ Audio track geldi, bağlantı başarılı!
+        callStatus = 'connected';
+        updateCallUI();
+      };
+      
+      // ✅ Connection state değişikliklerini izle
+      peerConnection.onconnectionstatechange = () => {
+        console.log('Connection state:', peerConnection.connectionState);
+        if (peerConnection.connectionState === 'connected') {
+          callStatus = 'connected';
+          updateCallUI();
+        } else if (peerConnection.connectionState === 'failed' || peerConnection.connectionState === 'disconnected') {
+          endVoiceCall();
+        }
+      };
+      
+      // Handle ICE candidates
+      peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+          socket.emit('voice:webrtc:ice-candidate', {
+            voiceCallId,
+            conversationId,
+            candidate: event.candidate
+          });
+        }
+      };
+      
+      // Create and send offer
+      const offer = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offer);
+      
+      socket.emit('voice:webrtc:offer', {
+        voiceCallId,
+        conversationId,
+        offer: peerConnection.localDescription
+      });
+      
+      console.log('WebRTC offer gönderildi');
+      
+    } catch (error) {
+      console.error('Peer connection kurulum hatası:', error);
+      await endVoiceCall();
+    }
+  }
+  
+  async function endVoiceCall() {
+    try {
+      // Stop local stream
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+      }
+      
+      // Close peer connection
+      if (peerConnection) {
+        peerConnection.close();
+        peerConnection = null;
+      }
+      
+      // Notify backend
+      if (voiceCallId) {
+        await fetch(`${API_URL}/api/voice/${voiceCallId}/end`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason: 'user_hangup' })
+        });
+      }
+      
+      isInCall = false;
+      callStatus = 'idle';
+      voiceCallId = null;
+      updateCallUI();
+      
+      console.log('Sesli çağrı sonlandırıldı');
+      
+    } catch (error) {
+      console.error('Çağrı sonlandırma hatası:', error);
+    }
+  }
+  
+  function updateCallUI() {
+    const voiceBtn = document.getElementById('asistr-voice-btn');
+    const callStatusDiv = document.getElementById('asistr-call-status');
+    
+    if (!voiceBtn || !callStatusDiv) return;
+    
+    // Update button state and title
+    voiceBtn.className = '';
+    if (callStatus === 'calling' || callStatus === 'ringing') {
+      voiceBtn.classList.add('calling');
+      voiceBtn.title = 'Aramayı Sonlandır';
+    } else if (callStatus === 'connected' || callStatus === 'connecting') {
+      voiceBtn.classList.add('in-call');
+      voiceBtn.title = 'Aramayı Sonlandır';
+    } else {
+      voiceBtn.title = 'Sesli Arama';
+    }
+    
+    // Update status message
+    if (callStatus === 'idle') {
+      callStatusDiv.style.display = 'none';
+      callStatusDiv.innerHTML = '';
+    } else {
+      callStatusDiv.style.display = 'block';
+      callStatusDiv.className = 'asistr-call-status ' + callStatus;
+      
+      switch (callStatus) {
+        case 'calling':
+          callStatusDiv.innerHTML = 'Çağrı başlatılıyor... <button onclick="window.asistTR_endCall()" style="margin-left:8px;padding:2px 8px;background:#ef4444;color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px;">İptal</button>';
+          break;
+        case 'ringing':
+          callStatusDiv.innerHTML = 'Temsilci aranıyor... <button onclick="window.asistTR_endCall()" style="margin-left:8px;padding:2px 8px;background:#ef4444;color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px;">İptal</button>';
+          break;
+        case 'connecting':
+          callStatusDiv.innerHTML = '✅ Temsilci kabul etti, bağlanıyor... <button onclick="window.asistTR_endCall()" style="margin-left:8px;padding:2px 8px;background:#ef4444;color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px;">Kapat</button>';
+          break;
+        case 'connected':
+          callStatusDiv.innerHTML = '🎤 Çağrı bağlandı - Konuşabilirsiniz <button onclick="window.asistTR_endCall()" style="margin-left:8px;padding:2px 8px;background:#ef4444;color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px;">Kapat</button>';
+          break;
+      }
+    }
+  }
+
+  // ✅ Global fonksiyon: Inline button'dan çağrılabilsin
+  window.asistTR_endCall = async function() {
+    await endVoiceCall();
+  };
+
   // Widget'ı başlat
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initWidget)
   } else {
     initWidget()
   }
+  
+  // ===== Proactive Chat Triggers =====
+  
+  // Page visit trigger - sayfa yüklendikten X saniye sonra
+  function setupPageVisitTrigger() {
+    setTimeout(() => {
+      if (!isOpen && !pageVisitTriggered) {
+        pageVisitTriggered = true;
+        showProactiveMessage('Hoş geldiniz! 👋 Size nasıl yardımcı olabiliriz?');
+      }
+    }, 10000); // 10 saniye sonra
+  }
+  
+  // Scroll trigger - sayfa %50'den fazla scroll edildiğinde
+  function setupScrollTrigger() {
+    window.addEventListener('scroll', () => {
+      if (scrollTriggered || isOpen) return;
+      
+      const scrollPercentage = (window.scrollY / (document.documentElement.scrollHeight - window.innerHeight)) * 100;
+      
+      if (scrollPercentage >= 50) {
+        scrollTriggered = true;
+        showProactiveMessage('💬 İlginizi çeken bir şey mi buldunuz? Sorularınızı yanıtlamaktan mutluluk duyarız.');
+      }
+    });
+  }
+  
+  // Exit intent trigger - kullanıcı sayfadan çıkmaya çalıştığında
+  function setupExitIntentTrigger() {
+    document.addEventListener('mouseleave', (e) => {
+      if (exitIntentTriggered || isOpen) return;
+      
+      // Fare ekranın üstünden çıktıysa (address bar'a gidiyorsa)
+      if (e.clientY <= 0) {
+        exitIntentTriggered = true;
+        showProactiveMessage('⚠️ Gitmeden önce yardım edebileceğimiz bir şey var mı?');
+      }
+    });
+  }
+  
+  // Cart abandonment trigger - sepet sayfasında belirli süre geçince
+  let cartAbandoned = false;
+  function setupCartAbandonmentTrigger() {
+    // Check if we're on cart/checkout page
+    const currentUrl = window.location.href.toLowerCase();
+    const isCartPage = currentUrl.includes('cart') || 
+                       currentUrl.includes('sepet') || 
+                       currentUrl.includes('checkout') || 
+                       currentUrl.includes('odeme');
+    
+    if (!isCartPage) return;
+    
+    // Wait 2 minutes on cart page
+    setTimeout(() => {
+      if (!cartAbandoned && !isOpen) {
+        cartAbandoned = true;
+        showProactiveMessage('🛒 Sepetinizi tamamlamak için yardıma mı ihtiyacınız var? Size yardımcı olalım!');
+      }
+    }, 120000); // 2 minutes
+  }
+  
+  // High-value page trigger - pricing/ücretlendirme sayfalarında
+  let highValuePageTriggered = false;
+  function setupHighValuePageTrigger() {
+    const currentUrl = window.location.href.toLowerCase();
+    const isHighValuePage = currentUrl.includes('pricing') || 
+                           currentUrl.includes('ucretlendirme') || 
+                           currentUrl.includes('fiyat') ||
+                           currentUrl.includes('plans') ||
+                           currentUrl.includes('paket');
+    
+    if (!isHighValuePage) return;
+    
+    // Wait 30 seconds on high-value pages
+    setTimeout(() => {
+      if (!highValuePageTriggered && !isOpen) {
+        highValuePageTriggered = true;
+        showProactiveMessage('💰 Fiyatlandırma hakkında sorularınız mı var? Size yardımcı olabiliriz!');
+      }
+    }, 30000); // 30 seconds
+  }
+  
+  // Returning visitor trigger - daha önce gelmiş ziyaretçilere özel mesaj
+  let returningVisitorTriggered = false;
+  function setupReturningVisitorTrigger() {
+    const visitCount = parseInt(localStorage.getItem('asistr_visit_count') || '0');
+    localStorage.setItem('asistr_visit_count', (visitCount + 1).toString());
+    
+    // 3. ziyaretten sonra mesaj göster
+    if (visitCount >= 2 && !returningVisitorTriggered) {
+      setTimeout(() => {
+        if (!isOpen) {
+          returningVisitorTriggered = true;
+          showProactiveMessage('👋 Tekrar hoş geldiniz! Size nasıl yardımcı olabiliriz?');
+        }
+      }, 5000); // 5 seconds
+    }
+  }
+  
+  // Idle trigger - 3 dakika boyunca hareket yoksa
+  let idleTimeout;
+  let idleTriggered = false;
+  function setupIdleTrigger() {
+    function resetIdleTimer() {
+      clearTimeout(idleTimeout);
+      idleTimeout = setTimeout(() => {
+        if (!idleTriggered && !isOpen) {
+          idleTriggered = true;
+          showProactiveMessage('💤 Hala orada mısınız? Size yardımcı olabilir miyiz?');
+        }
+      }, 180000); // 3 minutes
+    }
+    
+    // Reset timer on user activity
+    ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(event => {
+      document.addEventListener(event, resetIdleTimer, true);
+    });
+    
+    resetIdleTimer();
+  }
+  
+  // Element visibility trigger - belirli elementler görünür olduğunda
+  function setupElementVisibilityTrigger() {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting && !isOpen) {
+          const triggerMessage = entry.target.dataset.asistrTrigger;
+          if (triggerMessage && !triggeredMessages.has(triggerMessage)) {
+            triggeredMessages.add(triggerMessage);
+            showProactiveMessage(triggerMessage);
+          }
+        }
+      });
+    }, { threshold: 0.5 });
+    
+    // Observe elements with data-asistr-trigger attribute
+    document.querySelectorAll('[data-asistr-trigger]').forEach(el => {
+      observer.observe(el);
+    });
+  }
+  
+  // Proactive message göster
+  function showProactiveMessage(message) {
+    // Widget bubble'da küçük bir bildirim badge'i göster
+    const bubble = document.getElementById('asistr-bubble');
+    if (bubble) {
+      const badge = document.createElement('div');
+      badge.id = 'asistr-notification-badge';
+      badge.style.cssText = `
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        background: #ef4444;
+        color: white;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: bold;
+        animation: bounce 1s infinite;
+      `;
+      badge.textContent = '1';
+      bubble.appendChild(badge);
+      
+      // Badge tıklandığında widget aç ve mesajı göster
+      bubble.addEventListener('click', () => {
+        if (badge) badge.remove();
+      });
+    }
+  }
+  
+  // Tüm trigger'ları aktif et
+  setupPageVisitTrigger();
+  setupScrollTrigger();
+  setupExitIntentTrigger();
+  setupCartAbandonmentTrigger();
+  setupHighValuePageTrigger();
+  setupReturningVisitorTrigger();
+  setupIdleTrigger();
+  setupElementVisibilityTrigger();
+  
+  // ===== Page Tracking Function =====
+  function trackPageView() {
+    // Visitor bilgilerini topla
+    const pageData = {
+      apiKey: API_KEY,
+      sessionId: sessionId,
+      url: window.location.href,
+      title: document.title,
+      referrer: document.referrer,
+      userAgent: navigator.userAgent,
+      screenResolution: `${screen.width}x${screen.height}`,
+      language: navigator.language,
+      timestamp: new Date().toISOString()
+    };
+    
+    // Backend'e gönder
+    fetch(`${API_URL}/api/analytics/page-view`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(pageData)
+    }).catch(err => console.error('Page tracking error:', err));
+  }
+  
+  // ===== Rating Functions =====
+  let selectedRating = 0;
+  
+  function showRatingModal() {
+    document.getElementById('asistr-rating-modal').classList.add('show');
+  }
+  
+  function closeRatingModal() {
+    document.getElementById('asistr-rating-modal').classList.remove('show');
+    selectedRating = 0;
+    document.querySelectorAll('.asistr-star').forEach(star => {
+      star.classList.remove('active');
+    });
+    document.getElementById('asistr-feedback').value = '';
+  }
+  
+  function selectRating(rating) {
+    selectedRating = rating;
+    const stars = document.querySelectorAll('.asistr-star');
+    stars.forEach((star, index) => {
+      if (index < rating) {
+        star.classList.add('active');
+      } else {
+        star.classList.remove('active');
+      }
+    });
+  }
+  
+  async function submitRating() {
+    if (selectedRating === 0) {
+      alert('Lütfen bir yıldız seçin');
+      return;
+    }
+    
+    const feedback = document.getElementById('asistr-feedback').value.trim();
+    
+    try {
+      const response = await fetch(`${API_URL}/api/chat/${conversationId}/rate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rating: selectedRating, feedback })
+      });
+      
+      if (response.ok) {
+        closeRatingModal();
+        addMessage('agent', 'Teşekkürler! Geri bildiriminiz kaydedildi. 🙏');
+      } else {
+        alert('Değerlendirme gönderilemedi.');
+      }
+    } catch (error) {
+      console.error('Rating error:', error);
+      alert('Değerlendirme gönderilemedi.');
+    }
+  }
+  
+  // Expose showRatingModal for manual trigger
+  window.showChatRating = showRatingModal;
 
 })();
 
