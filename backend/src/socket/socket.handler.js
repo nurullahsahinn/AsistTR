@@ -5,6 +5,7 @@
 
 const { query } = require('../utils/database');
 const logger = require('../utils/logger');
+const { assignAgentToConversation, unassignAgent } = require('../services/routing.service');
 
 // Aktif bağlantıları sakla
 const activeConnections = new Map();
@@ -25,9 +26,9 @@ function socketHandler(io, socket) {
   // Ziyaretçi bağlandı
   socket.on('visitor:connect', async (data) => {
     try {
-      const { apiKey, sessionId, visitorInfo } = data;
+      const { apiKey, sessionId, visitorInfo, resumeConversationId, resumeVisitorId } = data;
       
-      logger.info('Visitor connect attempt:', { apiKey, sessionId, visitorInfo });
+      logger.info('Visitor connect attempt:', { apiKey, sessionId, visitorInfo, resumeConversationId });
       
       // API key'den site bilgisini al
       const siteResult = await query(
@@ -73,33 +74,111 @@ function socketHandler(io, socket) {
       } else {
         visitorId = visitor.rows[0].id;
         
-        // Mevcut ziyaretçinin bilgilerini güncelle (ad değişmiş olabilir)
-        await query(
-          `UPDATE visitors 
-           SET name = $1, email = $2, meta = $3, ip_address = $4, user_agent = $5
-           WHERE id = $6`,
-          [
-            visitorInfo?.name || 'Misafir',
-            visitorInfo?.email || null,
-            JSON.stringify(visitorInfo || {}),
-            socket.handshake.address,
-            socket.handshake.headers['user-agent'],
-            visitorId
-          ]
+        // Mevcut visitor'ın bilgilerini ve aktif conversation durumunu kontrol et
+        const visitorCheck = await query(
+          `SELECT v.name, 
+                  (SELECT COUNT(*) FROM conversations c WHERE c.visitor_id = v.id AND c.status = 'open') as open_conversations
+           FROM visitors v WHERE v.id = $1`,
+          [visitorId]
         );
+        const currentName = visitorCheck.rows[0]?.name;
+        const hasOpenConversations = visitorCheck.rows[0]?.open_conversations > 0;
         
-        logger.info('Existing visitor found and updated:', visitorId);
+        // Mevcut ziyaretçinin bilgilerini güncelle (SADECE yeni bilgi varsa)
+        // Name'i güncelle eğer:
+        // 1. Yeni isim var ve "Misafir" değil
+        // 2. VE (mevcut isim yok VEYA mevcut isim "Misafir" VEYA aktif sohbet yok)
+        const updateFields = [];
+        const updateValues = [];
+        let paramIndex = 1;
+        
+        const shouldUpdateName = visitorInfo?.name && 
+                                 visitorInfo.name !== 'Misafir' && 
+                                 (!currentName || currentName === 'Misafir' || !hasOpenConversations);
+        
+        if (shouldUpdateName) {
+          updateFields.push(`name = $${paramIndex++}`);
+          updateValues.push(visitorInfo.name);
+          logger.info(`✏️ Updating visitor name from "${currentName}" to "${visitorInfo.name}" (open_chats: ${hasOpenConversations})`);
+        } else {
+          logger.info(`✅ Keeping existing visitor name: "${currentName}" (new: "${visitorInfo?.name}", open_chats: ${hasOpenConversations})`);
+        }
+        
+        if (visitorInfo?.email) {
+          updateFields.push(`email = $${paramIndex++}`);
+          updateValues.push(visitorInfo.email);
+        }
+        
+        // Meta, IP ve User Agent her zaman güncelle
+        updateFields.push(`meta = $${paramIndex++}`);
+        updateValues.push(JSON.stringify(visitorInfo || {}));
+        
+        updateFields.push(`ip_address = $${paramIndex++}`);
+        updateValues.push(socket.handshake.address);
+        
+        updateFields.push(`user_agent = $${paramIndex++}`);
+        updateValues.push(socket.handshake.headers['user-agent']);
+        
+        updateFields.push(`last_seen = $${paramIndex++}`);
+        updateValues.push(new Date());
+        
+        updateValues.push(visitorId);
+        
+        if (updateFields.length > 0) {
+          await query(
+            `UPDATE visitors SET ${updateFields.join(', ')} WHERE id = $${paramIndex}`,
+            updateValues
+          );
+        }
+        
+        logger.info('Existing visitor found:', visitorId);
       }
       
-      // Konuşma oluştur
-      const conversation = await query(
-        `INSERT INTO conversations (site_id, visitor_id, status)
-         VALUES ($1, $2, 'open')
-         RETURNING id`,
-        [siteId, visitorId]
-      );
+      // Konuşma oluştur VEYA mevcut conversation'a bağlan
+      let conversationId;
+      let isResumed = false;
+      let previousMessages = [];
       
-      const conversationId = conversation.rows[0].id;
+      // Eğer resume conversation id varsa, kontrol et
+      if (resumeConversationId && resumeVisitorId === visitorId) {
+        const existingConv = await query(
+          `SELECT id, status FROM conversations 
+           WHERE id = $1 AND visitor_id = $2 AND status = 'open'`,
+          [resumeConversationId, visitorId]
+        );
+        
+        if (existingConv.rows.length > 0) {
+          conversationId = existingConv.rows[0].id;
+          isResumed = true;
+          
+          // Önceki mesajları getir
+          const messagesResult = await query(
+            `SELECT sender_type, body, created_at 
+             FROM messages 
+             WHERE conversation_id = $1 
+             ORDER BY created_at ASC 
+             LIMIT 50`,
+            [conversationId]
+          );
+          previousMessages = messagesResult.rows;
+          
+          logger.info(`✅ RESUMED conversation: ${conversationId}`);
+        } else {
+          logger.info(`⚠️ Resume failed, conversation closed or not found`);
+        }
+      }
+      
+      // Eğer resume edilemedi ise yeni conversation aç
+      if (!conversationId) {
+        const conversation = await query(
+          `INSERT INTO conversations (site_id, visitor_id, status)
+           VALUES ($1, $2, 'open')
+           RETURNING id`,
+          [siteId, visitorId]
+        );
+        conversationId = conversation.rows[0].id;
+        logger.info(`🆕 NEW conversation: ${conversationId}`);
+      }
       
       // KRITIK: Socket'i conversation room'una ekle
       const roomName = `conv:${conversationId}`;
@@ -116,7 +195,9 @@ function socketHandler(io, socket) {
       
       socket.emit('visitor:connected', { 
         conversationId,
-        visitorId 
+        visitorId,
+        isResumed,
+        messages: isResumed ? previousMessages : []
       });
       
       const newConversationData = {
@@ -134,6 +215,32 @@ function socketHandler(io, socket) {
       
       logger.info(`Ziyaretçi bağlandı ve yeni konuşma bildirildi - Conversation: ${conversationId}`);
       
+      // Auto-assign agent using routing service
+      try {
+        const assignedAgent = await assignAgentToConversation(conversationId, siteId);
+        
+        if (assignedAgent) {
+          logger.info(`Agent ${assignedAgent.id} auto-assigned to conversation ${conversationId}`);
+          
+          // Notify the assigned agent
+          io.to(`site:${siteId}:agents`).emit('conversation:assigned', {
+            conversationId,
+            agentId: assignedAgent.id,
+            agentName: assignedAgent.name
+          });
+          
+          // Notify visitor that agent joined
+          io.to(roomName).emit('agent:joined', {
+            conversationId,
+            agentId: assignedAgent.id,
+            message: 'Bir temsilci sohbete katıldı'
+          });
+        }
+      } catch (autoAssignError) {
+        logger.error('Auto-assign error:', autoAssignError);
+        // Continue even if auto-assign fails
+      }
+      
     } catch (error) {
       logger.error('Visitor connect hatası:', error);
       socket.emit('error', { message: 'Bağlantı hatası' });
@@ -144,6 +251,10 @@ function socketHandler(io, socket) {
   socket.on('agent:connect', async (data) => {
     try {
       const { agentId, siteId } = data;
+      
+      // CRITICAL: Agent'ı user room'una ekle (direct messaging için)
+      socket.join(`user:${agentId}`);
+      logger.info(`✅ Agent user room'una katıldı: user:${agentId}`);
       
       // Eğer siteId varsa o site'a, yoksa global odaya katıl
       if (siteId) {
@@ -406,6 +517,132 @@ function socketHandler(io, socket) {
     socket.to(roomName).emit('visitor:typing:stop');
   });
   
+  // WebRTC Signaling için event'ler
+  
+  // WebRTC Offer gönderme
+  socket.on('voice:webrtc:offer', async (data) => {
+    try {
+      const { voiceCallId, conversationId, offer } = data;
+      const connection = activeConnections.get(socket.id);
+      
+      if (!connection) {
+        return socket.emit('error', { message: 'Geçersiz bağlantı' });
+      }
+      
+      // Offer'ı veritabanına kaydet
+      await query(
+        `INSERT INTO webrtc_signaling (voice_call_id, from_type, from_id, signal_type, signal_data)
+         VALUES ($1, $2, $3, 'offer', $4)`,
+        [voiceCallId, connection.type, connection.agentId || connection.visitorId, JSON.stringify(offer)]
+      );
+      
+      // Karşı tarafa offer'ı ilet
+      const roomName = `conv:${conversationId}`;
+      socket.to(roomName).emit('voice:webrtc:offer', {
+        voiceCallId,
+        offer,
+        fromType: connection.type
+      });
+      
+      logger.info(`WebRTC offer gönderildi - Call: ${voiceCallId}, From: ${connection.type}`);
+      
+    } catch (error) {
+      logger.error('WebRTC offer hatası:', error);
+      socket.emit('error', { message: 'Offer gönderilemedi' });
+    }
+  });
+  
+  // WebRTC Answer gönderme
+  socket.on('voice:webrtc:answer', async (data) => {
+    try {
+      const { voiceCallId, conversationId, answer } = data;
+      const connection = activeConnections.get(socket.id);
+      
+      if (!connection) {
+        return socket.emit('error', { message: 'Geçersiz bağlantı' });
+      }
+      
+      // Answer'ı veritabanına kaydet
+      await query(
+        `INSERT INTO webrtc_signaling (voice_call_id, from_type, from_id, signal_type, signal_data)
+         VALUES ($1, $2, $3, 'answer', $4)`,
+        [voiceCallId, connection.type, connection.agentId || connection.visitorId, JSON.stringify(answer)]
+      );
+      
+      // Karşı tarafa answer'ı ilet
+      const roomName = `conv:${conversationId}`;
+      socket.to(roomName).emit('voice:webrtc:answer', {
+        voiceCallId,
+        answer,
+        fromType: connection.type
+      });
+      
+      logger.info(`WebRTC answer gönderildi - Call: ${voiceCallId}, From: ${connection.type}`);
+      
+    } catch (error) {
+      logger.error('WebRTC answer hatası:', error);
+      socket.emit('error', { message: 'Answer gönderilemedi' });
+    }
+  });
+  
+  // WebRTC ICE Candidate gönderme
+  socket.on('voice:webrtc:ice-candidate', async (data) => {
+    try {
+      const { voiceCallId, conversationId, candidate } = data;
+      const connection = activeConnections.get(socket.id);
+      
+      if (!connection) {
+        return socket.emit('error', { message: 'Geçersiz bağlantı' });
+      }
+      
+      // ICE candidate'i veritabanına kaydet
+      await query(
+        `INSERT INTO webrtc_signaling (voice_call_id, from_type, from_id, signal_type, signal_data)
+         VALUES ($1, $2, $3, 'ice-candidate', $4)`,
+        [voiceCallId, connection.type, connection.agentId || connection.visitorId, JSON.stringify(candidate)]
+      );
+      
+      // Karşı tarafa ICE candidate'i ilet
+      const roomName = `conv:${conversationId}`;
+      socket.to(roomName).emit('voice:webrtc:ice-candidate', {
+        voiceCallId,
+        candidate,
+        fromType: connection.type
+      });
+      
+      logger.info(`WebRTC ICE candidate gönderildi - Call: ${voiceCallId}`);
+      
+    } catch (error) {
+      logger.error('WebRTC ICE candidate hatası:', error);
+      socket.emit('error', { message: 'ICE candidate gönderilemedi' });
+    }
+  });
+  
+  // Çağrı durumu değişiklikleri
+  socket.on('voice:call:status', async (data) => {
+    try {
+      const { voiceCallId, conversationId, status } = data;
+      
+      // Durumu güncelle
+      await query(
+        'UPDATE voice_calls SET status = $1 WHERE id = $2',
+        [status, voiceCallId]
+      );
+      
+      // Karşı tarafa bildir
+      const roomName = `conv:${conversationId}`;
+      io.to(roomName).emit('voice:call:status', {
+        voiceCallId,
+        status
+      });
+      
+      logger.info(`Çağrı durumu değişti - Call: ${voiceCallId}, Status: ${status}`);
+      
+    } catch (error) {
+      logger.error('Call status hatası:', error);
+    }
+  });
+  
   // Bağlantı koptuğunda
   socket.on('disconnect', async (reason) => {
     try {
@@ -420,8 +657,30 @@ function socketHandler(io, socket) {
           [socket.id]
         );
         
+        // Aktif çağrıları sonlandır
+        await query(
+          `UPDATE voice_calls 
+           SET status = 'ended', end_time = NOW(), disconnect_reason = 'agent_disconnect'
+           WHERE agent_id = $1 AND status IN ('connecting', 'active')`,
+          [connection.agentId]
+        );
+        
+        // Broadcast agent offline status
+        io.emit('agent:status:changed', {
+          agentId: connection.agentId,
+          status: 'offline'
+        });
+        
         logger.info(`Agent bağlantısı kesildi: ${connection.agentId} (Sebep: ${reason})`);
       } else if (connection?.type === 'visitor') {
+        // Visitor'ın aktif çağrılarını sonlandır
+        await query(
+          `UPDATE voice_calls 
+           SET status = 'ended', end_time = NOW(), disconnect_reason = 'visitor_disconnect'
+           WHERE visitor_id = $1 AND status IN ('connecting', 'active')`,
+          [connection.visitorId]
+        );
+        
         logger.info(`Visitor bağlantısı kesildi: ${connection.visitorId} (Sebep: ${reason})`);
       }
       

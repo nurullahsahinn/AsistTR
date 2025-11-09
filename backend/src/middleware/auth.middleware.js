@@ -48,9 +48,26 @@ function adminOnly(req, res, next) {
   }
 }
 
+// Belirli rollerin geçebileceği middleware
+function requireRole(allowedRoles) {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Kimlik doğrulama gerekli' });
+    }
+    
+    if (allowedRoles.includes(req.user.role)) {
+      next();
+    } else {
+      res.status(403).json({ error: 'Bu işlem için yetkiniz yok' });
+    }
+  };
+}
+
 module.exports = {
+  authenticate: authMiddleware,
   authMiddleware,
-  adminOnly
+  adminOnly,
+  requireRole
 };
 
 

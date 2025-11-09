@@ -31,6 +31,20 @@ const authRoutes = require('./src/routes/auth.routes');
 const chatRoutes = require('./src/routes/chat.routes');
 const widgetRoutes = require('./src/routes/widget.routes');
 const ragRoutes = require('./src/routes/rag.routes');
+const agentRoutes = require('./src/routes/agent.routes');
+const departmentRoutes = require('./src/routes/department.routes');
+const cannedRoutes = require('./src/routes/canned.routes');
+const chatEnhancementRoutes = require('./src/routes/chatEnhancement.routes');
+const analyticsRoutes = require('./src/routes/analytics.routes');
+const widgetSettingsRoutes = require('./src/routes/widgetSettings.routes');
+const notificationRoutes = require('./src/routes/notification.routes');
+const presenceRoutes = require('./src/routes/presence.routes');
+const voiceCallRoutes = require('./src/routes/voiceCall.routes');
+const uploadRoutes = require('./src/routes/upload.routes');
+const agentStateRoutes = require('./src/routes/agentState.routes');
+const offlineMessageRoutes = require('./src/routes/offlineMessage.routes');
+const metricsRoutes = require('./src/routes/metrics.routes');
+const queueRoutes = require('./src/routes/queue.routes');
 
 // Socket handlers
 const socketHandler = require('./src/socket/socket.handler');
@@ -92,11 +106,45 @@ app.get('/health', (req, res) => {
   });
 });
 
-// API Routes
+// API Routes (with /api prefix)
 app.use('/api/auth', authRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/widget', widgetRoutes);
 app.use('/api/rag', ragRoutes);
+app.use('/api/agents', agentRoutes);
+app.use('/api/departments', departmentRoutes);
+app.use('/api/canned', cannedRoutes);
+app.use('/api/chat-enhancement', chatEnhancementRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/widget-settings', widgetSettingsRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/presence', presenceRoutes);
+app.use('/api/voice', voiceCallRoutes);
+app.use('/api/upload', uploadRoutes);
+app.use('/api/agent-state', agentStateRoutes);
+app.use('/api/offline-messages', offlineMessageRoutes);
+app.use('/api/metrics', metricsRoutes);
+app.use('/api/queue', queueRoutes);
+
+// API Routes (without /api prefix for backward compatibility)
+app.use('/auth', authRoutes);
+app.use('/chat', chatRoutes);
+app.use('/widget', widgetRoutes);
+app.use('/rag', ragRoutes);
+app.use('/agents', agentRoutes);
+app.use('/departments', departmentRoutes);
+app.use('/canned', cannedRoutes);
+app.use('/chat-enhancement', chatEnhancementRoutes);
+app.use('/analytics', analyticsRoutes);
+app.use('/widget-settings', widgetSettingsRoutes);
+app.use('/notifications', notificationRoutes);
+app.use('/presence', presenceRoutes);
+app.use('/voice', voiceCallRoutes);
+app.use('/upload', uploadRoutes);
+app.use('/agent-state', agentStateRoutes);
+app.use('/offline-messages', offlineMessageRoutes);
+app.use('/metrics', metricsRoutes);
+app.use('/queue', queueRoutes);
 
 // 404 Handler
 app.use((req, res) => {

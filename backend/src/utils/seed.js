@@ -28,7 +28,7 @@ async function seed() {
       const adminId = adminResult.rows[0].id;
 
       // Demo site oluştur
-      const apiKey = 'demo_' + Math.random().toString(36).substr(2, 32);
+      const apiKey = 'demo_qsqx6oi6qnq'; // Fixed API key for testing
       
       const siteResult = await query(
         `INSERT INTO sites (owner_id, name, domain, api_key, settings)

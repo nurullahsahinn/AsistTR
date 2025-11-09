@@ -71,10 +71,20 @@ async function createSite(req, res) {
 // Kullanıcının sitelerini listele
 async function getSites(req, res) {
   try {
-    const result = await query(
-      `SELECT * FROM sites WHERE owner_id = $1 ORDER BY created_at DESC`,
-      [req.user.id]
-    );
+    // Admin ise tüm siteleri getir, değilse kullanıcının site_id'sine ait siteyi getir
+    let result;
+    if (req.user.role === 'admin') {
+      result = await query(
+        `SELECT * FROM sites ORDER BY created_at DESC`
+      );
+    } else if (req.user.site_id) {
+      result = await query(
+        `SELECT * FROM sites WHERE id = $1`,
+        [req.user.site_id]
+      );
+    } else {
+      return res.json({ sites: [] });
+    }
     
     res.json({ sites: result.rows });
     
@@ -91,10 +101,18 @@ async function updateSiteSettings(req, res) {
     const { settings } = req.body;
     
     // Kullanıcının bu site'a erişimi var mı kontrol et
-    const checkResult = await query(
-      'SELECT id FROM sites WHERE id = $1 AND owner_id = $2',
-      [siteId, req.user.id]
-    );
+    let checkResult;
+    if (req.user.role === 'admin') {
+      checkResult = await query(
+        'SELECT id FROM sites WHERE id = $1',
+        [siteId]
+      );
+    } else {
+      checkResult = await query(
+        'SELECT id FROM sites WHERE id = $1 AND id = $2',
+        [siteId, req.user.site_id]
+      );
+    }
     
     if (checkResult.rows.length === 0) {
       return res.status(403).json({ error: 'Bu site için yetkiniz yok' });

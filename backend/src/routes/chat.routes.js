@@ -9,10 +9,14 @@ const {
   getMessages, 
   closeConversation,
   assignAgent,
-  deleteConversation // Yeni controller fonksiyonu
+  deleteConversation,
+  rateConversation // Yeni: Rating fonksiyonu
 } = require('../controllers/chat.controller');
-const { authMiddleware, adminOnly } = require('../middleware/auth.middleware'); // adminOnly'yi import et
+const { authMiddleware, adminOnly } = require('../middleware/auth.middleware');
 const { apiLimiter } = require('../middleware/rateLimit.middleware');
+
+// Public endpoint - Rating (auth gerekmez, visitor gönderiyor)
+router.post('/:conversationId/rate', rateConversation);
 
 // Tüm route'lar auth gerektirir
 router.use(authMiddleware);

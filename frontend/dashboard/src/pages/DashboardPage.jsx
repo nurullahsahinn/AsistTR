@@ -3,6 +3,8 @@ import { siteApi, chatApi, ragApi } from '../services/api'
 import { useAuthStore } from '../store/authStore'
 import { FiMessageCircle, FiUsers, FiCheckCircle, FiClock, FiShield } from 'react-icons/fi'
 import toast from 'react-hot-toast'
+import QueueMonitor from '../components/QueueMonitor'
+import PerformanceMetrics from '../components/PerformanceMetrics'
 
 function DashboardPage() {
   const { user } = useAuthStore()
@@ -102,6 +104,15 @@ function DashboardPage() {
           title="Ort. Yanıt Süresi"
           value={stats.avgResponseTime}
           color="orange"
+        />
+      </div>
+
+      {/* Yeni Özellikler - Queue Monitor & Performance Metrics */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <QueueMonitor />
+        <PerformanceMetrics 
+          agentId={!isAdmin ? user?.id : null}
+          siteId={isAdmin && sites[0] ? sites[0].id : null}
         />
       </div>
 

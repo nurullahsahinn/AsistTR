@@ -4,15 +4,44 @@
  */
 
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
+import { useEffect } from 'react'
 import { useAuthStore } from '../store/authStore'
-import { FiMessageSquare, FiBook, FiSettings, FiLogOut, FiHome, FiUsers } from 'react-icons/fi'
+import { FiMessageSquare, FiBook, FiSettings, FiLogOut, FiHome, FiUsers, FiBriefcase, FiFileText, FiBarChart2, FiLayout, FiBell } from 'react-icons/fi'
+import AgentStatusSelector from './AgentStatusSelector'
+import socketService from '../services/socket'
+import { voiceApi } from '../services/api'
 
 function DashboardLayout() {
   const { user, logout } = useAuthStore()
   const navigate = useNavigate()
   const location = useLocation()
 
+  // Initialize socket connection when layout mounts
+  useEffect(() => {
+    if (user && user.id) {
+      // ✅ Eğer zaten bağlıysa tekrar bağlanma
+      if (socketService.socket?.connected) {
+        console.log('✅ Socket zaten bağlı, yeni connection açılmıyor')
+        return
+      }
+      
+      console.log('Initializing socket connection for agent:', user.id)
+      socketService.connect(user.id, user.site_id)
+      
+      // Set agent as available for voice calls
+      voiceApi.updateCallAvailability(true, 1)
+        .then(() => console.log('✅ Agent marked as available for calls'))
+        .catch(err => console.error('❌ Failed to set call availability:', err))
+    }
+
+    return () => {
+      // Don't disconnect on unmount to maintain connection across pages
+      // socketService.disconnect()
+    }
+  }, [user])
+
   const handleLogout = () => {
+    socketService.disconnect()
     logout()
     navigate('/login')
   }
@@ -20,12 +49,17 @@ function DashboardLayout() {
   let menuItems = [
     { path: '/', icon: FiHome, label: 'Ana Sayfa' },
     { path: '/chat', icon: FiMessageSquare, label: 'Sohbetler' },
+    { path: '/canned-responses', icon: FiFileText, label: 'Hazır Yanıtlar' },
+    { path: '/analytics', icon: FiBarChart2, label: 'Analitik' },
+    { path: '/notifications', icon: FiBell, label: 'Bildirimler' },
   ];
 
   if (user?.role === 'admin') {
     menuItems.push(
+      { path: '/agents', icon: FiUsers, label: 'Agent Yönetimi' },
+      { path: '/departments', icon: FiBriefcase, label: 'Departmanlar' },
+      { path: '/widget-settings', icon: FiLayout, label: 'Widget Ayarları' },
       { path: '/knowledge', icon: FiBook, label: 'Bilgi Tabanı' },
-      { path: '/users', icon: FiUsers, label: 'Kullanıcılar' },
       { path: '/settings', icon: FiSettings, label: 'Ayarlar' }
     );
   }
@@ -61,6 +95,11 @@ function DashboardLayout() {
 
         {/* User Info */}
         <div className="absolute bottom-0 w-64 p-4 border-t border-gray-200">
+          {/* Agent Status */}
+          <div className="mb-3">
+            <AgentStatusSelector />
+          </div>
+          
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 font-bold">
               {user?.name?.charAt(0).toUpperCase()}

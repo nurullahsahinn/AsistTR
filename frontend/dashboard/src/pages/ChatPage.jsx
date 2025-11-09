@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
-import { chatApi, ragApi } from '../services/api'
+import { chatApi, ragApi, api } from '../services/api'
 import { useAuthStore } from '../store/authStore'
 import { useChatStore } from '../store/chatStore'
 import socketService from '../services/socket'
 import toast from 'react-hot-toast'
-import { FiSend, FiZap, FiXCircle, FiTrash2, FiPaperclip, FiDownload } from 'react-icons/fi'
+import { FiSend, FiZap, FiXCircle, FiTrash2, FiPaperclip, FiDownload, FiRefreshCw, FiTag, FiFileText, FiStar, FiUsers, FiPhone, FiPhoneOff, FiPhoneIncoming } from 'react-icons/fi'
 import { formatDistanceToNow } from 'date-fns'
 import { tr } from 'date-fns/locale'
 import { userApi } from '../services/api'
+import VoiceCallPanel from '../components/VoiceCallPanel'
 
 const AttachmentPreview = ({ file }) => {
   const isImage = file.type.startsWith('image/');
@@ -199,6 +200,24 @@ function ChatPage() {
   const [isLoadingSuggestion, setIsLoadingSuggestion] = useState(false)
   const [isUploading, setIsUploading] = useState(false);
   const [streamingMessage, setStreamingMessage] = useState(''); // Streaming mesaj için
+  const [showCannedResponses, setShowCannedResponses] = useState(false);
+  const [cannedResponses, setCannedResponses] = useState([]);
+  const [tags, setTags] = useState([]);
+  const [conversationTags, setConversationTags] = useState([]);
+  const [notes, setNotes] = useState([]);
+  const [showRating, setShowRating] = useState(false);
+  const [agents, setAgents] = useState([]);
+  const [showTransfer, setShowTransfer] = useState(false);
+  
+  // Voice call state
+  const [incomingCall, setIncomingCall] = useState(null);
+  const [activeVoiceCall, setActiveVoiceCall] = useState(null);
+  const [peerConnection, setPeerConnection] = useState(null);
+  const [localStream, setLocalStream] = useState(null);
+  const [callStatus, setCallStatus] = useState('idle'); // idle, ringing, connecting, connected
+  const [callDuration, setCallDuration] = useState(0); // Arama süresi (saniye)
+  const callTimerRef = useRef(null);
+  
   const messagesEndRef = useRef(null)
   const audioRef = useRef(null);
   const typingTimeoutRef = useRef(null);
@@ -218,22 +237,38 @@ function ChatPage() {
       socketService.connect(user.id, user.site_id || null)
     }
 
-    // Yeni mesaj geldiğinde
-    socketService.on('message:received', (message) => {
+    // Socket listener'larını tanımla
+    const handleMessageReceived = (message) => {
       if (message.conversationId === useChatStore.getState().activeConversation) {
-        addMessage(message)
-        setStreamingMessage('') // Streaming mesajı temizle
-        scrollToBottom()
+        // Backend'den gelen mesajı normalize et
+        const normalizedMessage = {
+          id: message.id,
+          sender_type: message.senderType,
+          sender_id: message.sender_id,
+          body: message.body,
+          attachments: message.attachments,
+          created_at: message.createdAt
+        };
+        
+        addMessage(normalizedMessage);
+        setStreamingMessage(''); // Streaming mesajı temizle
+        scrollToBottom();
       }
-    })
+      
+      // ✅ Conversation listesini güncelle ve en üste taşı
+      useChatStore.getState().updateOrAddConversation({
+        id: message.conversationId,
+        last_message: message.body?.substring(0, 100),
+        last_message_time: message.createdAt || new Date().toISOString()
+      });
+    };
 
-    // Streaming mesaj parçası geldiğinde
-    socketService.on('message:chunk', (data) => {
+    const handleMessageChunk = (data) => {
       if (data.conversationId === useChatStore.getState().activeConversation) {
         setStreamingMessage(prev => prev + data.chunk)
         scrollToBottom()
       }
-    })
+    };
 
     const handleNewEvent = (conversation) => {
       // Konuşmayı her durumda güncelle
@@ -246,42 +281,153 @@ function ChatPage() {
       }
     };
 
-    // Yeni konuşma geldiğinde
-    socketService.on('conversation:new', (conversation) => {
+    const handleConversationNew = (conversation) => {
       toast.success(`Yeni sohbet: ${conversation.visitor_name}`)
       handleNewEvent(conversation);
-    })
+    };
 
-    // Konuşma güncellendiğinde (yeni mesaj vs)
-    socketService.on('conversation:update', (conversation) => {
+    const handleConversationUpdate = (conversation) => {
       handleNewEvent(conversation);
-    })
+    };
 
-    // Konuşma kapatıldığında listeden kaldır
-    socketService.on('conversation:closed', ({ conversationId }) => {
+    const handleConversationClosed = ({ conversationId }) => {
       removeConversation(conversationId)
       toast.success('Bir sohbet kapatıldı.')
-    })
+    };
 
-    // Konuşma silindiğinde listeden kaldır
-    socketService.on('conversation:deleted', ({ conversationId }) => {
+    const handleConversationDeleted = ({ conversationId }) => {
       removeConversation(conversationId)
       toast('Bir sohbet kalıcı olarak silindi.', { icon: '🗑️' })
-    })
+    };
 
-    // Bir sohbete ajan atandığında
-    socketService.on('conversation:assigned', ({ conversationId, agentId, agentName }) => {
+    const handleConversationAssigned = ({ conversationId, agentId, agentName }) => {
       assignAgentToConversation(conversationId, agentId, agentName);
-    });
+    };
+    
+    // Voice call events
+    const handleIncomingCall = (data) => {
+      console.log('Incoming call:', data);
+      setIncomingCall(data);
+      audioRef.current?.play().catch(e => console.error("Ses çalınamadı:", e));
+      toast('Gelen sesli çağrı!', { icon: '📞' });
+    };
+    
+    const handleCallAccepted = (data) => {
+      console.log('Call accepted:', data);
+      setCallStatus('connecting');
+    };
+    
+    const handleWebRTCOffer = async (data) => {
+      console.log('WebRTC offer received:', data);
+      try {
+        // If peer connection doesn't exist yet, create it
+        if (!peerConnection && activeVoiceCall) {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          setLocalStream(stream);
+          await setupPeerConnection(stream, activeVoiceCall.voiceCallId, activeVoiceCall.conversationId);
+        }
+        
+        if (peerConnection) {
+          await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+          const answer = await peerConnection.createAnswer();
+          await peerConnection.setLocalDescription(answer);
+          
+          socketService.socket.emit('voice:webrtc:answer', {
+            voiceCallId: activeVoiceCall.voiceCallId,
+            conversationId: activeVoiceCall.conversationId,
+            answer: peerConnection.localDescription
+          });
+          
+          console.log('WebRTC answer sent');
+        }
+      } catch (error) {
+        console.error('WebRTC offer handling error:', error);
+        toast.error('WebRTC bağlantı hatası');
+        await endCall();
+      }
+    };
+    
+    const handleWebRTCAnswer = async (data) => {
+      console.log('WebRTC answer received');
+      if (peerConnection) {
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+      }
+    };
+    
+    const handleICECandidate = async (data) => {
+      console.log('ICE candidate received');
+      if (peerConnection && data.candidate) {
+        await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+      }
+    };
+    
+    const handleCallEnded = (data) => {
+      console.log('Call ended:', data);
+      setIncomingCall(null); // ✅ Incoming call'u temizle
+      endCall();
+    };
 
+    // Listener'ları ekle
+    socketService.on('message:received', handleMessageReceived);
+    socketService.on('message:chunk', handleMessageChunk);
+    socketService.on('conversation:new', handleConversationNew);
+    socketService.on('conversation:update', handleConversationUpdate);
+    socketService.on('conversation:closed', handleConversationClosed);
+    socketService.on('conversation:deleted', handleConversationDeleted);
+    socketService.on('conversation:assigned', handleConversationAssigned);
+    socketService.on('voice:call:incoming', handleIncomingCall);
+    socketService.on('voice:call:accepted', handleCallAccepted);
+    socketService.on('voice:webrtc:offer', handleWebRTCOffer);
+    socketService.on('voice:webrtc:answer', handleWebRTCAnswer);
+    socketService.on('voice:webrtc:ice-candidate', handleICECandidate);
+    socketService.on('voice:call:ended', handleCallEnded);
+
+    // Cleanup: listener'ları kaldır
     return () => {
-      socketService.removeAllListeners()
+      socketService.off('message:received', handleMessageReceived);
+      socketService.off('message:chunk', handleMessageChunk);
+      socketService.off('conversation:new', handleConversationNew);
+      socketService.off('conversation:update', handleConversationUpdate);
+      socketService.off('conversation:closed', handleConversationClosed);
+      socketService.off('conversation:deleted', handleConversationDeleted);
+      socketService.off('conversation:assigned', handleConversationAssigned);
+      socketService.off('voice:call:incoming', handleIncomingCall);
+      socketService.off('voice:call:accepted', handleCallAccepted);
+      socketService.off('voice:webrtc:offer', handleWebRTCOffer);
+      socketService.off('voice:webrtc:answer', handleWebRTCAnswer);
+      socketService.off('voice:webrtc:ice-candidate', handleICECandidate);
+      socketService.off('voice:call:ended', handleCallEnded);
     }
   }, [user])
 
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+  
+  // ✅ Call duration timer
+  useEffect(() => {
+    if (callStatus === 'connected') {
+      // Timer başlat
+      callTimerRef.current = setInterval(() => {
+        setCallDuration(prev => prev + 1);
+      }, 1000);
+    } else {
+      // Timer durdur ve sıfırla
+      if (callTimerRef.current) {
+        clearInterval(callTimerRef.current);
+        callTimerRef.current = null;
+      }
+      if (callStatus === 'idle') {
+        setCallDuration(0);
+      }
+    }
+    
+    return () => {
+      if (callTimerRef.current) {
+        clearInterval(callTimerRef.current);
+      }
+    };
+  }, [callStatus])
 
   const loadConversations = async () => {
     try {
@@ -297,9 +443,16 @@ function ChatPage() {
     markAsRead(conversationId); // Okundu olarak işaretle
     setAiSuggestion(null)
     
+    // Agent conversation room'una katıl
+    socketService.joinConversation(conversationId, user.id);
+    
     try {
       const response = await chatApi.getMessages(conversationId)
       setMessages(response.data.messages)
+      
+      // Load additional data
+      loadConversationTags(conversationId)
+      loadConversationNotes(conversationId)
     } catch (error) {
       toast.error('Mesajlar yüklenemedi')
     }
@@ -312,18 +465,19 @@ function ChatPage() {
     // Socket'e gönder
     socketService.sendMessage(activeConversation, messageBody, attachments);
     
-    // UI'ye anlık ekle (optimistic update)
-    const newMessage = {
-      sender_type: 'agent',
-      body: messageBody,
-      attachments: attachments,
-      created_at: new Date().toISOString()
-    };
-    addMessage(newMessage);
+    // Sol taraftaki conversation listesini güncelle
+    const updatedConv = conversations.find(c => c.id === activeConversation);
+    if (updatedConv) {
+      upsertConversation({
+        ...updatedConv,
+        last_message: messageBody,
+        last_message_time: new Date().toISOString()
+      });
+    }
     
     setMessageInput('');
     setAiSuggestion(null);
-    scrollToBottom();
+    // Backend'den mesaj gelince scroll olacak
   };
 
   const handleKeyPress = (e) => {
@@ -415,7 +569,16 @@ function ChatPage() {
 
   // Yazma durumunu yönet
   const handleTyping = (e) => {
-    setMessageInput(e.target.value);
+    const value = e.target.value;
+    setMessageInput(value);
+
+    // Check for canned response shortcut
+    if (value.startsWith('/')) {
+      setShowCannedResponses(true);
+      if (cannedResponses.length === 0) loadCannedResponses();
+    } else {
+      setShowCannedResponses(false);
+    }
 
     // Eğer timeout zaten varsa, temizle ve baştan başlat
     if (typingTimeoutRef.current) {
@@ -432,9 +595,264 @@ function ChatPage() {
     }, 1500);
   };
 
+  // Load canned responses
+  const loadCannedResponses = async () => {
+    try {
+      const { data } = await api.get('/canned');
+      setCannedResponses(data.cannedResponses || []);
+    } catch (error) {
+      console.error('Failed to load canned responses:', error);
+    }
+  };
+
+  // Use canned response
+  const useCannedResponse = (content) => {
+    setMessageInput(content);
+    setShowCannedResponses(false);
+  };
+
+  // Load conversation tags
+  const loadConversationTags = async (conversationId) => {
+    try {
+      const { data } = await api.get(`/api/chat-enhancement/conversations/${conversationId}/tags`);
+      setConversationTags(data.tags || []);
+      
+      // Also load all available tags if not loaded
+      if (tags.length === 0) {
+        const tagsRes = await api.get('/chat-enhancement/tags');
+        setTags(tagsRes.data.tags || []);
+      }
+    } catch (error) {
+      console.error('Failed to load tags:', error);
+    }
+  };
+
+  // Add tag to conversation
+  const addTag = async (tagId) => {
+    try {
+      await api.post('/chat-enhancement/tags/assign', {
+        conversationId: activeConversation,
+        tagId
+      });
+      loadConversationTags(activeConversation);
+      toast.success('Tag added');
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to add tag');
+    }
+  };
+
+  // Remove tag
+  const removeTag = async (tagId) => {
+    try {
+      await api.delete(`/api/chat-enhancement/tags/${activeConversation}/${tagId}`);
+      loadConversationTags(activeConversation);
+      toast.success('Tag removed');
+    } catch (error) {
+      toast.error('Failed to remove tag');
+    }
+  };
+
+  // Load conversation notes
+  const loadConversationNotes = async (conversationId) => {
+    try {
+      const { data } = await api.get(`/api/chat-enhancement/conversations/${conversationId}/notes`);
+      setNotes(data.notes || []);
+    } catch (error) {
+      console.error('Failed to load notes:', error);
+    }
+  };
+
+  // Add note
+  const addNote = async (noteText) => {
+    if (!noteText.trim()) return;
+    
+    try {
+      await api.post(`/api/chat-enhancement/conversations/${activeConversation}/notes`, {
+        note: noteText
+      });
+      loadConversationNotes(activeConversation);
+      toast.success('Note added');
+    } catch (error) {
+      toast.error('Failed to add note');
+    }
+  };
+
+  // Submit rating
+  const submitRating = async (rating, comment) => {
+    try {
+      await api.post(`/api/chat-enhancement/conversations/${activeConversation}/rating`, {
+        rating,
+        feedback_comment: comment
+      });
+      toast.success('Rating submitted');
+      setShowRating(false);
+    } catch (error) {
+      toast.error('Failed to submit rating');
+    }
+  };
+
+  // Transfer chat
+  const transferChat = async (toAgentId, reason) => {
+    try {
+      await api.post(`/api/chat-enhancement/conversations/${activeConversation}/transfer`, {
+        toAgentId,
+        reason
+      });
+      toast.success('Chat transferred successfully');
+      setShowTransfer(false);
+      // Reload conversations
+      loadConversations();
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to transfer chat');
+    }
+  };
+
+  // Load agents for transfer
+  const loadAgents = async () => {
+    try {
+      const { data } = await api.get('/agents');
+      setAgents(data.agents || []);
+    } catch (error) {
+      console.error('Failed to load agents:', error);
+    }
+  };
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
+  
+  // ===== Voice Call Functions =====
+  
+  const rtcConfig = {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' }
+    ]
+  };
+  
+  // Accept incoming call
+  const acceptCall = async (voiceCallId, conversationId) => {
+    try {
+      setCallStatus('connecting');
+      
+      // Request microphone permission
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      setLocalStream(stream);
+      
+      // Accept call on backend (✅ API instance kullan - Authorization otomatik)
+      const response = await api.post(`/voice/${voiceCallId}/accept`);
+      
+      setActiveVoiceCall(response.data);
+      setIncomingCall(null);
+      
+      // Setup WebRTC
+      await setupPeerConnection(stream, voiceCallId, conversationId);
+      
+      toast.success('Çağrı bağlandı');
+      
+    } catch (error) {
+      console.error('Accept call error:', error);
+      toast.error('Çağrı kabul edilemedi');
+      setCallStatus('idle');
+    }
+  };
+  
+  // Reject incoming call
+  const rejectCall = async (voiceCallId) => {
+    try {
+      await api.post(`/voice/${voiceCallId}/reject`);
+      
+      setIncomingCall(null);
+      toast('Çağrı reddedildi', { icon: 'ℹ️' });
+      
+    } catch (error) {
+      console.error('Reject call error:', error);
+    }
+  };
+  
+  // Setup WebRTC peer connection
+  const setupPeerConnection = async (stream, voiceCallId, conversationId) => {
+    try {
+      const pc = new RTCPeerConnection(rtcConfig);
+      
+      // Add local stream
+      stream.getTracks().forEach(track => {
+        pc.addTrack(track, stream);
+      });
+      
+      // Handle remote stream
+      pc.ontrack = (event) => {
+        console.log('✅ Remote track received, audio will play');
+        const remoteAudio = new Audio();
+        remoteAudio.srcObject = event.streams[0];
+        remoteAudio.play();
+        
+        // ✅ Track geldi, connection başarılı!
+        setCallStatus('connected');
+        toast.success('🎤 Ses bağlantısı kuruldu');
+      };
+      
+      // ✅ Connection state değişikliklerini izle
+      pc.onconnectionstatechange = () => {
+        console.log('Connection state:', pc.connectionState);
+        if (pc.connectionState === 'connected') {
+          setCallStatus('connected');
+        } else if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
+          toast.error('Bağlantı kesildi');
+          endCall();
+        }
+      };
+      
+      // Handle ICE candidates
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          socketService.socket.emit('voice:webrtc:ice-candidate', {
+            voiceCallId,
+            conversationId,
+            candidate: event.candidate
+          });
+        }
+      };
+      
+      setPeerConnection(pc);
+      setCallStatus('connected');
+      
+    } catch (error) {
+      console.error('Peer connection setup error:', error);
+      await endCall();
+    }
+  };
+  
+  // End call
+  const endCall = async () => {
+    try {
+      // Stop local stream
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        setLocalStream(null);
+      }
+      
+      // Close peer connection
+      if (peerConnection) {
+        peerConnection.close();
+        setPeerConnection(null);
+      }
+      
+      // Notify backend (✅ API instance kullan)
+      if (activeVoiceCall) {
+        await api.post(`/voice/${activeVoiceCall.voiceCallId}/end`, { 
+          reason: 'agent_hangup' 
+        });
+      }
+      
+      setActiveVoiceCall(null);
+      setCallStatus('idle');
+      toast('Çağrı sonlandırıldı', { icon: '📞' });
+      
+    } catch (error) {
+      console.error('End call error:', error);
+    }
+  };
 
   return (
     <div className="flex h-screen">
@@ -596,6 +1014,29 @@ function ChatPage() {
 
             {/* Mesaj Gönderme */}
             <div className="bg-white border-t p-4">
+              {/* Canned Responses Dropdown */}
+              {showCannedResponses && cannedResponses.length > 0 && (
+                <div className="mb-2 max-h-48 overflow-y-auto bg-gray-50 border rounded-lg">
+                  {cannedResponses
+                    .filter(cr => cr.shortcut?.startsWith(messageInput) || cr.title.toLowerCase().includes(messageInput.slice(1).toLowerCase()))
+                    .slice(0, 5)
+                    .map(cr => (
+                      <button
+                        key={cr.id}
+                        onClick={() => useCannedResponse(cr.content)}
+                        className="w-full text-left px-3 py-2 hover:bg-blue-50 border-b last:border-b-0"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-sm">{cr.title}</span>
+                          {cr.shortcut && <code className="text-xs bg-gray-200 px-2 py-0.5 rounded">{cr.shortcut}</code>}
+                        </div>
+                        <p className="text-xs text-gray-600 truncate">{cr.content}</p>
+                      </button>
+                    ))
+                  }
+                </div>
+              )}
+              
               <div className="flex gap-2 mb-2">
                 <button
                   onClick={getAiSuggestion}
@@ -605,6 +1046,13 @@ function ChatPage() {
                   <FiZap />
                   {isLoadingSuggestion ? 'Öneri alınıyor...' : 'AI Öneri Al'}
                 </button>
+                <button
+                  onClick={() => { setShowTransfer(true); loadAgents(); }}
+                  className="flex items-center gap-2 px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                >
+                  <FiUsers />
+                  Transfer
+                </button>
               </div>
               <div className="flex gap-2">
                 <input
@@ -612,7 +1060,7 @@ function ChatPage() {
                   value={messageInput}
                   onChange={handleTyping} // onChange event'ini yeni fonksiyona bağla
                   onKeyPress={handleKeyPress}
-                  placeholder="Mesajınızı yazın..."
+                  placeholder="Mesajınızı yazın... (/ için şablonlar)"
                   className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
                 />
                 <input 
@@ -645,6 +1093,135 @@ function ChatPage() {
           </div>
         )}
       </div>
+
+      {/* Right Sidebar - Tags, Notes, Actions */}
+      {activeConversation && (
+        <div className="w-80 bg-white border-l overflow-y-auto">
+          {/* Tags Section */}
+          <div className="p-4 border-b">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold flex items-center gap-2">
+                <FiTag /> Tags
+              </h3>
+            </div>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {conversationTags.map(tag => (
+                <span
+                  key={tag.id}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium"
+                  style={{ backgroundColor: tag.color + '20', color: tag.color }}
+                >
+                  {tag.name}
+                  <button
+                    onClick={() => removeTag(tag.tag_id)}
+                    className="hover:opacity-70"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+            <select
+              onChange={(e) => { if (e.target.value) addTag(e.target.value); e.target.value = ''; }}
+              className="w-full text-sm border rounded px-2 py-1"
+            >
+              <option value="">Add tag...</option>
+              {tags.filter(t => !conversationTags.find(ct => ct.tag_id === t.id)).map(tag => (
+                <option key={tag.id} value={tag.id}>{tag.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Notes Section */}
+          <div className="p-4 border-b">
+            <h3 className="font-semibold flex items-center gap-2 mb-3">
+              <FiFileText /> Internal Notes
+            </h3>
+            <div className="space-y-2 mb-3 max-h-48 overflow-y-auto">
+              {notes.map(note => (
+                <div key={note.id} className="bg-yellow-50 p-2 rounded text-sm">
+                  <p className="text-gray-700">{note.note}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {note.agent_name} - {new Date(note.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <div>
+              <textarea
+                placeholder="Add internal note..."
+                className="w-full text-sm border rounded px-2 py-1"
+                rows="2"
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    addNote(e.target.value);
+                    e.target.value = '';
+                  }
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Rating Section */}
+          <div className="p-4 border-b">
+            <h3 className="font-semibold flex items-center gap-2 mb-3">
+              <FiStar /> Customer Rating
+            </h3>
+            <button
+              onClick={() => setShowRating(!showRating)}
+              className="w-full px-3 py-2 bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 text-sm"
+            >
+              Request Rating
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Transfer Modal */}
+      {showTransfer && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96">
+            <h3 className="text-lg font-bold mb-4">Transfer Chat</h3>
+            <select
+              className="w-full border rounded px-3 py-2 mb-4"
+              onChange={(e) => {
+                if (e.target.value) {
+                  transferChat(e.target.value, '');
+                }
+              }}
+            >
+              <option value="">Select agent...</option>
+              {agents.filter(a => a.id !== user.id).map(agent => (
+                <option key={agent.id} value={agent.id}>
+                  {agent.name} - {agent.online_status}
+                </option>
+              ))}
+            </select>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowTransfer(false)}
+                className="px-4 py-2 border rounded hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Voice Call Panel - Yeni Modern UI */}
+      <VoiceCallPanel
+        incomingCall={incomingCall ? {
+          ...incomingCall,
+          visitorName: conversations.find(c => c.id === incomingCall.conversationId)?.visitor_name || 'Ziyaretçi'
+        } : null}
+        onAccept={() => acceptCall(incomingCall?.voiceCallId, incomingCall?.conversationId)}
+        onReject={() => rejectCall(incomingCall?.voiceCallId)}
+        onEnd={endCall}
+        callStatus={callStatus}
+        duration={callDuration}
+      />
     </div>
   )
 }

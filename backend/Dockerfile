@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Dependencies
 COPY package*.json ./
-RUN npm install --production
+RUN npm install --ignore-scripts
 
 # App kaynak dosyaları
 COPY . .
@@ -14,6 +14,6 @@ RUN mkdir -p logs
 
 EXPOSE 4000
 
-CMD ["node", "app.js"]
+CMD ["npm", "run", "dev"]
 
 

@@ -5,6 +5,7 @@
 
 const { query, transaction, pool } = require('../utils/database');
 const logger = require('../utils/logger');
+const { unassignAgent, transferConversation } = require('../services/routing.service');
 
 // io objesini global değişkenden al
 function getIO() {
@@ -50,7 +51,9 @@ async function getConversations(req, res) {
       paramCount++;
     }
     
-    sql += ' ORDER BY c.created_at DESC LIMIT 50';
+    // ✅ En son mesaj gelen conversation en üstte
+    // ORDER BY'da subquery'yi tekrar yazıyoruz (PostgreSQL alias kullanamıyor)
+    sql += ' ORDER BY COALESCE((SELECT created_at FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1), c.created_at) DESC LIMIT 50';
     
     const result = await query(sql, params);
     
@@ -74,7 +77,6 @@ async function getMessages(req, res) {
         m.sender_type,
         m.body,
         m.attachments,
-        m.is_read,
         m.created_at
        FROM messages m
        WHERE m.conversation_id = $1
@@ -101,12 +103,18 @@ async function closeConversation(req, res) {
       `UPDATE conversations 
        SET status = 'closed', closed_at = NOW(), rating = $1
        WHERE id = $2
-       RETURNING site_id`,
+       RETURNING site_id, agent_id`,
       [rating || null, conversationId]
     );
 
     if (result.rows.length > 0) {
-      const { site_id } = result.rows[0];
+      const { site_id, agent_id } = result.rows[0];
+      
+      // Unassign agent (decrease chat count)
+      if (agent_id) {
+        await unassignAgent(conversationId, agent_id);
+      }
+      
       // Agent'lara sohbetin kapandığını bildir
       const io = getIO();
       io.to(`site:${site_id}:agents`).emit('conversation:closed', { conversationId });
@@ -130,13 +138,21 @@ async function assignAgent(req, res) {
     const { agentId } = req.body; // Atanacak agent'ın ID'si
     const requestingAgentName = req.user.name; // Atamayı yapan agent'ın adı
     
-    const result = await query(
-      'UPDATE conversations SET agent_id = $1 WHERE id = $2 RETURNING site_id',
-      [agentId, conversationId]
+    // Get current agent to handle transfer
+    const convResult = await query(
+      'SELECT agent_id, site_id FROM conversations WHERE id = $1',
+      [conversationId]
     );
     
-    if (result.rows.length > 0) {
-      const { site_id } = result.rows[0];
+    if (convResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Konuşma bulunamadı' });
+    }
+    
+    const { agent_id: currentAgentId, site_id } = convResult.rows[0];
+    
+    // Use routing service for transfer
+    try {
+      await transferConversation(conversationId, currentAgentId, agentId);
       
       // Agent'lara sohbetin atandığını bildir
       const io = getIO();
@@ -148,8 +164,9 @@ async function assignAgent(req, res) {
       
       logger.info(`Konuşma ${conversationId}, agent ${agentId}'e atandı.`);
       res.json({ message: 'Agent atandı' });
-    } else {
-      res.status(404).json({ error: 'Konuşma bulunamadı' });
+      
+    } catch (transferError) {
+      return res.status(400).json({ error: transferError.message });
     }
     
   } catch (error) {
@@ -196,12 +213,59 @@ async function deleteConversation(req, res) {
   }
 }
 
+// Konuşmayı değerlendir (Rating - Public endpoint)
+async function rateConversation(req, res) {
+  try {
+    const { conversationId } = req.params;
+    const { rating, feedback } = req.body;
+    
+    // Rating validation (1-5 yıldız)
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ error: 'Rating 1-5 arasında olmalı' });
+    }
+    
+    // Konuşmayı güncelle (sadece rating, feedback kolonu yok)
+    const result = await query(
+      `UPDATE conversations 
+       SET rating = $1
+       WHERE id = $2
+       RETURNING site_id, agent_id`,
+      [rating, conversationId]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Konuşma bulunamadı' });
+    }
+    
+    const { site_id, agent_id } = result.rows[0];
+    
+    // Agent'a rating bildirimini gönder
+    if (agent_id) {
+      const io = getIO();
+      io.to(`site:${site_id}:agents`).emit('conversation:rated', {
+        conversationId,
+        agentId: agent_id,
+        rating,
+        feedback
+      });
+    }
+    
+    logger.info(`Konuşma değerlendirildi: ${conversationId}, Rating: ${rating}`);
+    res.json({ message: 'Değerlendirme kaydedildi', rating });
+    
+  } catch (error) {
+    logger.error('RateConversation hatası:', error);
+    res.status(500).json({ error: 'Değerlendirme kaydedilemedi' });
+  }
+}
+
 module.exports = {
   getConversations,
   getMessages,
   closeConversation,
   assignAgent,
-  deleteConversation
+  deleteConversation,
+  rateConversation
 };
 
 

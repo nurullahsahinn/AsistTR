@@ -9,6 +9,12 @@ import DashboardPage from './pages/DashboardPage'
 import ChatPage from './pages/ChatPage'
 import KnowledgePage from './pages/KnowledgePage'
 import SettingsPage from './pages/SettingsPage'
+import AgentsPage from './pages/AgentsPage'
+import DepartmentsPage from './pages/DepartmentsPage'
+import CannedResponsesPage from './pages/CannedResponsesPage'
+import AnalyticsPage from './pages/AnalyticsPage'
+import WidgetSettingsPage from './pages/WidgetSettingsPage'
+import NotificationSettingsPage from './pages/NotificationSettingsPage'
 
 // Layout
 import DashboardLayout from './components/DashboardLayout'
@@ -32,6 +38,12 @@ function App() {
           >
             <Route index element={<DashboardPage />} />
             <Route path="chat" element={<ChatPage />} />
+            <Route path="agents" element={<AgentsPage />} />
+            <Route path="departments" element={<DepartmentsPage />} />
+            <Route path="canned-responses" element={<CannedResponsesPage />} />
+            <Route path="analytics" element={<AnalyticsPage />} />
+            <Route path="widget-settings" element={<WidgetSettingsPage />} />
+            <Route path="notifications" element={<NotificationSettingsPage />} />
             <Route path="knowledge" element={<KnowledgePage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
