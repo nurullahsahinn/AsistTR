@@ -1,50 +1,107 @@
 # 🇹🇷 AsistTR - Yerli ve Milli Canlı Destek Platformu
 
-**AsistTR**, Tawk.to benzeri yerli canlı destek platformudur ve RAG (Retrieval-Augmented Generation) teknolojisi ile güçlendirilmiştir.
+<div align="center">
+
+**Tawk.to benzeri, RAG teknolojisi ile güçlendirilmiş, self-hosted canlı destek platformu**
+
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![Node.js](https://img.shields.io/badge/Node.js-18-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)](https://reactjs.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![WebRTC](https://img.shields.io/badge/WebRTC-Enabled-333333?logo=webrtc)](https://webrtc.org/)
+
+[Demo](#) · [Dokümantasyon](#) · [Özellikler](#-temel-özellikler) · [Kurulum](#-hızlı-başlangıç)
+
+</div>
+
+---
 
 ## 🎯 Proje Amacı
 
-Web sitelerine gömülebilir bir sohbet widget'ı sunarak ziyaretçilerle **gerçek zamanlı** iletişim kurmayı ve **yapay zeka destekli** otomatik yanıtlar vermeyi sağlar.
+**AsistTR**, web sitelerine gömülebilir bir sohbet widget'ı sunarak ziyaretçilerle **gerçek zamanlı** iletişim kurmayı, **sesli arama** yapmayı ve **yapay zeka destekli** otomatik yanıtlar vermeyi sağlayan **açık kaynaklı** bir platformdur.
 
 ## ✨ Temel Özellikler
 
 ### ✅ Tamamlanan Özellikler
-- 💬 **Gerçek Zamanlı Mesajlaşma**: WebSocket ile anlık iletişim
-- 🤖 **AI Destekli Yanıtlar**: RAG teknolojisi ile akıllı otomatik cevaplar
-- 📊 **Admin Dashboard**: Agent paneli, sohbet yönetimi
-- 🔐 **Güvenli Kimlik Doğrulama**: JWT tabanlı auth sistemi
-- 💾 **Mesaj Geçmişi**: Tüm konuşmalar veritabanında saklanır
-- 🌍 **Kolay Entegrasyon**: Tek satır kod ile web sitenize ekleyin
-- ⏱️ **Streaming Yanıtlar**: ChatGPT benzeri karakter karakter metin görüntüleme
-- 📝 **Markdown Desteği**: Başlıklar, listeler, kalın/italik metin renderı
-- 🔄 **Otomatik Güncelleme**: Tüm mesajlar ve sohbetler anlık güncellenir
-- 📦 **Dosya Gönderimi**: Resim ve belge paylaşımı
-- 🧠 **Hibrit Arama**: Text-based + Vector-based bilgi alma
+
+#### 💬 Mesajlaşma & İletişim
+- **Gerçek Zamanlı Mesajlaşma**: WebSocket ile anlık iletişim
+- **Sesli Arama (WebRTC)**: Widget'tan doğrudan sesli arama başlatma
+- **Typing Indicators**: Karşı tarafın yazma durumunu gösterme
+- **Mesaj Geçmişi**: Tüm konuşmalar veritabanında saklanır
+- **Dosya Gönderimi**: Resim ve belge paylaşımı
+- **Session Continuity**: Returning visitor için sohbet devam ettirme
+
+#### 🤖 AI & RAG Sistemi
+- **AI Destekli Yanıtlar**: RAG teknolojisi ile akıllı otomatik cevaplar
+- **Streaming Yanıtlar**: ChatGPT benzeri karakter karakter metin görüntüleme
+- **Markdown Desteği**: Başlıklar, listeler, kalın/italik metin renderı
+- **Hibrit Arama**: Text-based + Vector-based bilgi alma
+- **pgvector + HNSW Index**: Yüksek performanslı vector search
+
+#### 👥 Agent Yönetimi
+- **Çoklu Agent Desteği**: Sınırsız agent ekleyebilme
+- **Agent Durumları**: Çevrimiçi, Meşgul, Dışarıda, Molada, Rahatsız Etmeyin
+- **Departman Yönetimi**: Agent'ları departmanlara atama
+- **Skill-Based Routing**: Yeteneklere göre akıllı yönlendirme
+- **Agent Call Availability**: Sesli arama kabul etme durumu
+- **Canned Responses**: Hazır yanıt şablonları
+
+#### 🎯 Routing & Queue
+- **Round Robin**: Sıralı agent dağıtımı
+- **Least Busy**: En az meşgul agent'a yönlendirme
+- **Department Routing**: Departman bazlı yönlendirme
+- **Call Queue**: Müşteri bekleme kuyruğu
+- **Queue Position Tracking**: Kuyruk sırası takibi
+
+#### 🔔 Bildirimler & Analytics
+- **Real-time Notifications**: Yeni mesaj ve arama bildirimleri
+- **Desktop Notifications**: Tarayıcı bildirimleri
+- **Notification Preferences**: Kişiselleştirilebilir bildirim ayarları
+- **Page View Tracking**: Ziyaretçi davranış analizi
+- **Conversation Metrics**: Sohbet istatistikleri
+
+#### 🎨 Widget
+- **Proactive Chat**: Otomatik sohbet başlatma (time, scroll, idle, element visibility triggers)
+- **Customizable Widget**: API key bazlı site ayarları
+- **Kolay Entegrasyon**: Tek satır kod ile web sitenize ekleyin
+- **Responsive Design**: Mobil uyumlu tasarım
+
+#### 🔐 Güvenlik & Yönetim
+- **JWT Tabanlı Auth**: Güvenli kimlik doğrulama
+- **Role-Based Access**: Admin/Agent rol yönetimi
+- **Multi-Site Support**: Tek platformda çoklu site yönetimi
+- **API Key Management**: Site bazlı API key kontrolü
+- **Rate Limiting**: DDoS koruması
 
 
-### Gelecek Özellikler
-- 📈 **Analitik & Raporlama**: Detaylı istatistikler
-- 👥 **Çoklu Agent Desteği**: Ekip yönetimi
-- 📱 **Mobil Uygulama**: iOS & Android
-- 🎨 **Widget Özelleştirme**: Tema, renk, dil seçenekleri
-- 📧 **E-posta Entegrasyonu**: Offline mesaj desteği
-- 🔔 **Push Bildirimler**: Anlık uyarılar
+### 🚧 Gelecek Özellikler
+- 📈 **Advanced Analytics**: Detaylı performans raporları (CSAT, FRT, ART)
+- 🌍 **Multi-Language**: Çoklu dil desteği
+- 📱 **Mobil Uygulama**: iOS & Android native app
+- 🎨 **Widget Theme Builder**: Görsel özelleştirme paneli
+- 📧 **Email Integration**: Offline mesajlar için e-posta yönlendirme
+- 🔔 **Push Notifications**: Progressive Web App bildirimleri
+- 🤝 **CRM Integration**: Salesforce, HubSpot entegrasyonu
+- 📊 **Advanced Queue Management**: Priority queue, timeout, max size
 
 ## 🏗️ Mimari
 
 ```
 Ziyaretçi (Widget)
-    ↓
+    ↓ WebSocket + WebRTC
 Backend (Node.js + Express + Socket.IO)
     ↓
-    ├── Gerçek Zamanlı Mesajlaşma
-    ├── REST API
+    ├── Gerçek Zamanlı Mesajlaşma (Socket.IO)
+    ├── WebRTC Signaling (Voice Calls)
+    ├── REST API (Express)
     ├── RAG Pipeline
-    │   ├── Vector Database (FAISS/Pinecone)
-    │   ├── Embedding (OpenAI/Local Model)
-    │   └── LLM (GPT-4/Llama/Mistral)
-    └── PostgreSQL + Redis
-    ↓
+    │   ├── Vector Database (pgvector + HNSW)
+    │   ├── Embedding (nomic-embed-text)
+    │   └── LLM (Ollama llama3.1:8b)
+    ├── PostgreSQL 16 + pgvector
+    └── Redis 7 (Cache & Session)
+    ↓ WebSocket
 Admin Dashboard (React)
 ```
 
@@ -52,15 +109,16 @@ Admin Dashboard (React)
 
 | Katman | Teknoloji |
 |--------|-----------|
-| **Frontend** | React + Vite + Tailwind CSS |
-| **Backend** | Node.js + Express.js + Socket.IO |
+| **Frontend** | React 18 + Vite 5 + Tailwind CSS 3 |
+| **Backend** | Node.js 18 + Express 4 + Socket.IO 4 |
 | **Database** | PostgreSQL 16 + pgvector |
 | **Cache** | Redis 7 |
 | **RAG** | LangChain + pgvector (HNSW index) |
 | **LLM** | Ollama (llama3.1:8b) - Local |
 | **Embedding** | nomic-embed-text (768 dimensions) |
+| **Voice** | WebRTC (Peer-to-Peer) |
 | **Auth** | JWT + bcrypt |
-| **Deployment** | Docker + Docker Compose |
+| **Deployment** | Docker 24 + Docker Compose 2 |
 | **Real-time** | WebSocket / Socket.IO |
 
 ## 📁 Proje Yapısı
@@ -101,47 +159,6 @@ AsistTR/
 - 8GB RAM (minimum)
 - 20GB Disk Alanı
 
-### Kurulum
-
-1. **Projeyi Klonlayın**
-```bash
-git clone https://github.com/[kullanici]/AsistTR.git
-cd AsistTR
-```
-
-2. **Environment Variables**
-```bash
-cp backend/.env.example backend/.env
-# .env dosyasını düzenleyin
-```
-
-3. **Docker ile Çalıştırma** (Önerilen)
-```bash
-# Tüm servisleri başlat
-docker-compose up -d
-
-# Ollama modellerini yükle
-docker exec -i asistr_ollama ollama pull llama3.1:8b
-docker exec -i asistr_ollama ollama pull nomic-embed-text:latest
-
-# Veritabanı migration
-docker exec -i asistr_backend node migrate.js
-
-# Bilgi tabanı seed (isteğe bağlı)
-docker exec -i asistr_postgres psql -U asistr_user -d asistr_db -f /seed_knowledge.sql
-
-# Vector index oluştur (performans için)
-docker exec -i asistr_backend node create-vector-index.js
-
-# Embeddings oluştur
-docker exec -i asistr_backend node regenerate-embeddings.js
-```
-
-4. **Servislere Erişin**
-- Dashboard: http://localhost:3000
-- Widget Test: http://localhost:5173/test-widget.html
-- Backend API: http://localhost:4000
-- Ollama: http://localhost:11434
 
 
 
@@ -149,7 +166,11 @@ docker exec -i asistr_backend node regenerate-embeddings.js
 
 ### Widget Entegrasyonu
 
-Web sitenize aşağıdaki kodu ekleyin:
+1. **Dashboard'dan API Key alın**
+   - http://localhost:3000 adresine giriş yapın
+   - Widget Settings sayfasından API Key'inizi kopyalayın
+
+2. **Web sitenize kodu ekleyin**
 
 ```html
 <script>
@@ -158,13 +179,46 @@ Web sitenize aşağıdaki kodu ekleyin:
   var s = document.createElement('script');
   s.type = 'text/javascript';
   s.async = true;
-  s.src = 'https://asistr.com/widget.js';
-  s.setAttribute('data-widget-id', 'WIDGET_ID_BURAYA');
+  s.src = 'http://localhost:5173/widget.js';
+  s.setAttribute('data-api-key', 'YOUR_API_KEY_HERE');
   var x = document.getElementsByTagName('script')[0];
   x.parentNode.insertBefore(s, x);
 })();
 </script>
 ```
+
+3. **Özelleştirme (Opsiyonel)**
+
+```html
+<script>
+(function(){
+  var w = window;
+  w.AsistTRConfig = {
+    apiKey: 'YOUR_API_KEY_HERE',
+    primaryColor: '#4F46E5',
+    position: 'right', // 'left' or 'right'
+    welcomeMessage: 'Merhaba! Size nasıl yardımcı olabilirim?',
+    agentName: 'Destek Ekibi',
+    proactiveChat: {
+      enabled: true,
+      timeOnPage: 30, // saniye
+      scrollPercentage: 50 // %
+    }
+  };
+  var s = document.createElement('script');
+  s.src = 'http://localhost:5173/widget.js';
+  document.head.appendChild(s);
+})();
+</script>
+```
+
+### Dashboard Kullanımı
+
+1. **Giriş yapın**: http://localhost:3000
+2. **Agent durumunuzu ayarlayın**: Çevrimiçi, Meşgul, Dışarıda, Molada, Rahatsız Etmeyin
+3. **Gelen mesajları görüntüleyin**: Sol panelden conversations listesi
+4. **Sesli arama kabul edin**: Bildirim geldiğinde Accept butonuna tıklayın
+5. **Hazır yanıtları kullanın**: `/` yazarak canned responses'ları görün
 
 ## 🧠 RAG Nasıl Çalışır?
 
@@ -235,7 +289,9 @@ AI Yanıtı (Streaming + Markdown):
 
 #### `users`
 Admin/Agent kullanıcılar
-- `id`, `name`, `email`, `password`, `role` (admin/agent)
+- `id`, `name`, `email`, `password`, `role` (admin/agent/superadmin)
+- `site_id`, `department_id`, `skills` (TEXT[])
+- `max_chats`, `current_chats`, `priority_level`
 - `created_at`, `updated_at`
 
 #### `sites`
@@ -247,7 +303,8 @@ Kayıtlı web siteleri
 Ziyaretçiler
 - `id`, `site_id`, `session_id`, `name`, `email`
 - `ip_address`, `user_agent`, `meta` (JSON)
-- `created_at`
+- `is_vip`, `language`
+- `created_at`, `last_seen`
 
 #### `conversations`
 Sohbet oturumları
@@ -269,8 +326,42 @@ RAG bilgi tabanı
 
 #### `agents_presence`
 Agent çevrimiçi durumu
-- `agent_id`, `socket_id`, `status` (online/offline)
+- `agent_id`, `socket_id`
+- `status` (online/offline), `state` (Çevrimiçi, Meşgul, Dışarıda, Molada, Rahatsız Etmeyin)
+- `state_message`, `state_until`
 - `last_seen`
+
+#### `departments`
+Departmanlar
+- `id`, `site_id`, `name`, `description`
+- `created_at`, `updated_at`
+
+#### `voice_calls`
+Sesli aramalar
+- `id`, `conversation_id`, `visitor_id`, `agent_id`
+- `status` (pending/ringing/active/completed/missed/rejected)
+- `started_at`, `answered_at`, `ended_at`, `duration`
+
+#### `call_queue`
+Arama kuyruğu
+- `id`, `conversation_id`, `visitor_id`, `site_id`
+- `status` (waiting/assigned/timeout/cancelled)
+- `priority`, `queue_position`, `entered_at`
+
+#### `canned_responses`
+Hazır yanıtlar
+- `id`, `site_id`, `agent_id`, `title`, `content`
+- `shortcut`, `created_at`
+
+#### `notification_preferences`
+Bildirim tercihleri
+- `user_id`, `new_message`, `new_conversation`, `voice_call`
+- `desktop_notifications`, `sound_enabled`
+
+#### `agent_call_availability`
+Agent sesli arama durumu
+- `agent_id`, `is_available`
+- `updated_at`
 
 ### Index'ler
 
@@ -287,96 +378,44 @@ CREATE INDEX idx_messages_conversation ON messages(conversation_id, created_at);
 CREATE INDEX idx_visitors_session ON visitors(site_id, session_id);
 ```
 
-## 🔧 Geliştirme Komutları
-
-### Container Yönetimi
-```bash
-# Tüm servisleri başlat
-docker-compose up -d
-
-# Servisleri durdur
-docker-compose down
-
-# Logları gör
-docker-compose logs -f [servis-adi]
-
-# Container'a gir
-docker exec -it asistr_backend sh
-
-# Yeniden build (cache temizleyerek)
-docker-compose build --no-cache [servis-adi]
-```
-
-### Backend Komutları
-```bash
-# Migration çalıştır
-docker exec -i asistr_backend node migrate.js
-
-# Embeddings oluştur
-docker exec -i asistr_backend node regenerate-embeddings.js
-
-# Vector index oluştur
-docker exec -i asistr_backend node create-vector-index.js
-
-# Backend logları
-docker logs -f asistr_backend
-```
-
-### Ollama Komutları
-```bash
-# Model listesi
-docker exec -i asistr_ollama ollama list
-
-# Model yükle
-docker exec -i asistr_ollama ollama pull llama3.1:8b
-
-# Model test
-docker exec -i asistr_ollama ollama run llama3.1:8b "Merhaba"
-```
-
-### Veritabanı Komutları
-```bash
-# PostgreSQL'e bağlan
-docker exec -it asistr_postgres psql -U asistr_user -d asistr_db
-
-# Backup al
-docker exec asistr_postgres pg_dump -U asistr_user asistr_db > backup.sql
-
-# Restore
-docker exec -i asistr_postgres psql -U asistr_user -d asistr_db < backup.sql
-```
 
 
-## 🤝 Katkıda Bulunma
 
-Bu proje bir bitirme projesidir. Önerileriniz için issue açabilirsiniz.
+
+
+---
+
 
 ## 📄 Lisans
 
 MIT License
 
-## 👨‍💻 Geliştirici
-
-Nurullah Şahin - Bitirme Projesi - 2025
-
-### Teknolojiler
-
-- **Frontend**: React 18, Vite 5, Tailwind CSS 3
-- **Backend**: Node.js 18, Express 4, Socket.IO 4
-- **Database**: PostgreSQL 16 (pgvector), Redis 7
-- **AI/ML**: Ollama (llama3.1:8b), nomic-embed-text
-- **DevOps**: Docker 24, Docker Compose 2
-
-### Proje İstatistikleri
-
-- **Toplam Kod Satırı**: ~8,000+ LOC
-- **Geliştirme Süresi**: 3 ay
-- **Servis Sayısı**: 6 (Backend, Dashboard, Widget, Postgres, Redis, Ollama)
-- **Endpoint Sayısı**: 25+
-- **WebSocket Event**: 15+
-
 ---
 
+## 👨‍💻 Proje Hakkında
+
+Bu proje **tawk.to benzeri** yerli ve milli bir canlı destek platformudur. Temel özellikler tamamlanmış olup, gelişmiş analitik ve raporlama özellikleri üzerinde çalışılmaktadır.
+
+### 📊 İstatistikler
+
+- **Toplam Kod Satırı**: ~12,000+ LOC
+- **Geliştirme Süresi**: 4 ay
+- **Servis Sayısı**: 6 (Backend, Dashboard, Widget, PostgreSQL, Redis, Ollama)
+- **API Endpoint**: 35+
+- **WebSocket Event**: 20+
+- **Database Tablo**: 20+
+- **React Component**: 40+
+
+### 💡 Kullanım Senaryoları
+
+- E-ticaret siteleri için 7/24 müşteri desteği
+- SaaS ürünleri için teknik destek
+- Kurumsal şirketler için call center sistemi
+- Eğitim platformları için öğrenci danışmanlığı
+- Kamu kurumları için vatandaş hizmetleri
+
+---
 **Not**: Bu proje aktif geliştirme aşamasındadır. MVP özellikleri tamamlandıkça güncellenecektir.
+**Geliştirici**: Nurullah Şahin - Bitirme Projesi 2025
 
 
