@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { FiUsers, FiEye, FiMessageCircle, FiClock, FiMonitor, FiSmartphone, FiTablet, FiGlobe } from 'react-icons/fi'
+import { FiUsers, FiEye, FiMessageCircle, FiClock, FiMonitor, FiSmartphone, FiTablet, FiGlobe, FiStar } from 'react-icons/fi'
 import toast from 'react-hot-toast'
 import api from '../services/api'
 
@@ -10,6 +10,7 @@ function AnalyticsPage() {
   const [topPages, setTopPages] = useState([])
   const [trafficSources, setTrafficSources] = useState([])
   const [deviceStats, setDeviceStats] = useState(null)
+  const [agentPerformance, setAgentPerformance] = useState([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -34,12 +35,13 @@ function AnalyticsPage() {
       const params = siteId ? `?period=${period}&siteId=${siteId}` : `?period=${period}`
       const onlineParams = siteId ? `?siteId=${siteId}` : ''
       
-      const [analyticsRes, onlineRes, pagesRes, sourcesRes, devicesRes] = await Promise.all([
+      const [analyticsRes, onlineRes, pagesRes, sourcesRes, devicesRes, agentPerfRes] = await Promise.all([
         api.get(`/analytics/dashboard${params}`),
         siteId ? api.get(`/analytics/online-visitors${onlineParams}`) : Promise.resolve({ data: { visitors: [] } }),
         api.get(`/analytics/top-pages?period=${period}&limit=10${siteId ? '&siteId=' + siteId : ''}`),
         api.get(`/analytics/traffic-sources?period=${period}${siteId ? '&siteId=' + siteId : ''}`),
-        api.get(`/analytics/device-stats?period=${period}${siteId ? '&siteId=' + siteId : ''}`)
+        api.get(`/analytics/device-stats?period=${period}${siteId ? '&siteId=' + siteId : ''}`),
+        api.get(`/analytics/agent-performance?period=${period}${siteId ? '&siteId=' + siteId : ''}`)
       ])
       
       setAnalytics(analyticsRes.data)
@@ -47,6 +49,7 @@ function AnalyticsPage() {
       setTopPages(pagesRes.data.pages || [])
       setTrafficSources(sourcesRes.data.sources || [])
       setDeviceStats(devicesRes.data)
+      setAgentPerformance(agentPerfRes.data.performance || [])
       
     } catch (error) {
       console.error('Failed to load analytics:', error)
@@ -176,6 +179,49 @@ function AnalyticsPage() {
               </div>
             ))}
           </div>
+        </div>
+      </div>
+
+      {/* Agent Performance */}
+      <div className="bg-white rounded-lg shadow p-6 mt-6">
+        <h2 className="text-xl font-bold mb-4">Agent Performansı</h2>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Agent</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Toplam Sohbet</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ort. Puan</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ort. İlk Yanıt (sn)</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ort. Çözüm Süresi (sn)</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {agentPerformance.map(agent => (
+                <tr key={agent.agent_id}>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0 h-10 w-10">
+                        <img className="h-10 w-10 rounded-full" src={agent.avatar_url || `https://ui-avatars.com/api/?name=${agent.agent_name}&background=random`} alt={agent.agent_name} />
+                      </div>
+                      <div className="ml-4">
+                        <div className="text-sm font-medium text-gray-900">{agent.agent_name}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{agent.total_chats}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <div className="flex items-center">
+                      <FiStar className="text-yellow-400 mr-1" />
+                      {agent.average_rating ? parseFloat(agent.average_rating).toFixed(2) : 'N/A'}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{agent.avg_first_response_time ? Math.round(agent.avg_first_response_time) : 'N/A'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{agent.avg_resolution_time ? Math.round(agent.avg_resolution_time / 60) : 'N/A'} dk</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 

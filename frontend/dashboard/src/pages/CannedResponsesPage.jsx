@@ -19,12 +19,12 @@ function CannedResponsesPage() {
   })
 
   const categories = [
-    { value: 'greeting', label: 'Greeting' },
-    { value: 'common', label: 'Common' },
-    { value: 'closing', label: 'Closing' },
-    { value: 'info', label: 'Information' },
-    { value: 'support', label: 'Support' },
-    { value: 'sales', label: 'Sales' }
+    { value: 'greeting', label: 'Selamlama' },
+    { value: 'common', label: 'Genel' },
+    { value: 'closing', label: 'Kapanış' },
+    { value: 'info', label: 'Bilgilendirme' },
+    { value: 'support', label: 'Destek' },
+    { value: 'sales', label: 'Satış' }
   ]
 
   useEffect(() => {
@@ -44,8 +44,8 @@ function CannedResponsesPage() {
       const { data } = await api.get('/canned')
       setResponses(data.cannedResponses || [])
     } catch (error) {
-      console.error('Failed to load responses:', error)
-      toast.error('Failed to load canned responses')
+      console.error('Hazır yanıtlar yüklenemedi:', error)
+      toast.error('Hazır yanıtlar yüklenemedi')
     } finally {
       setIsLoading(false)
     }
@@ -57,10 +57,10 @@ function CannedResponsesPage() {
     try {
       if (editingResponse) {
         await api.put(`/canned/${editingResponse.id}`, formData)
-        toast.success('Response updated successfully')
+        toast.success('Yanıt başarıyla güncellendi')
       } else {
         await api.post('/canned', formData)
-        toast.success('Response created successfully')
+        toast.success('Yanıt başarıyla oluşturuldu')
       }
       
       setShowModal(false)
@@ -68,8 +68,8 @@ function CannedResponsesPage() {
       setFormData({ title: '', content: '', shortcut: '', category: 'common' })
       loadResponses()
     } catch (error) {
-      console.error('Failed to save response:', error)
-      toast.error(error.response?.data?.error || 'Failed to save response')
+      console.error('Yanıt kaydedilemedi:', error)
+      toast.error(error.response?.data?.error || 'Yanıt kaydedilemedi')
     }
   }
 
@@ -85,21 +85,21 @@ function CannedResponsesPage() {
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Are you sure you want to delete this response?')) return
+    if (!confirm('Bu yanıtı silmek istediğinizden emin misiniz?')) return
     
     try {
       await api.delete(`/canned/${id}`)
-      toast.success('Response deleted successfully')
+      toast.success('Yanıt başarıyla silindi')
       loadResponses()
     } catch (error) {
-      console.error('Failed to delete response:', error)
-      toast.error('Failed to delete response')
+      console.error('Yanıt silinemedi:', error)
+      toast.error('Yanıt silinemedi')
     }
   }
 
   const copyShortcut = (shortcut) => {
     navigator.clipboard.writeText(shortcut)
-    toast.success('Shortcut copied to clipboard')
+    toast.success('Kısayol panoya kopyalandı')
   }
 
   if (isLoading) {
@@ -114,8 +114,8 @@ function CannedResponsesPage() {
     <div className="p-8">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Canned Responses</h1>
-          <p className="text-gray-600">Pre-defined message templates for quick replies</p>
+          <h1 className="text-2xl font-bold text-gray-800">Hazır Yanıtlar</h1>
+          <p className="text-gray-600">Hızlı yanıtlar için önceden tanımlanmış mesaj şablonları</p>
         </div>
         <button
           onClick={() => {
@@ -125,7 +125,7 @@ function CannedResponsesPage() {
           }}
           className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
         >
-          <FiPlus /> New Response
+          <FiPlus /> Yeni Yanıt
         </button>
       </div>
 
@@ -133,7 +133,7 @@ function CannedResponsesPage() {
       <div className="bg-white rounded-lg shadow p-4 mb-6">
         <div className="flex items-center gap-2 flex-wrap">
           <FiFilter className="text-gray-500" />
-          <span className="text-sm text-gray-600">Filter:</span>
+          <span className="text-sm text-gray-600">Filtrele:</span>
           <button
             onClick={() => setSelectedCategory('all')}
             className={`px-3 py-1 rounded-full text-sm ${
@@ -142,7 +142,7 @@ function CannedResponsesPage() {
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
-            All ({responses.length})
+            Tümü ({responses.length})
           </button>
           {categories.map(cat => {
             const count = responses.filter(r => r.category === cat.value).length
@@ -211,7 +211,7 @@ function CannedResponsesPage() {
 
       {filteredResponses.length === 0 && (
         <div className="text-center py-12 text-gray-500">
-          No canned responses found
+          Hazır yanıt bulunamadı
         </div>
       )}
 
@@ -220,14 +220,14 @@ function CannedResponsesPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-2xl">
             <h2 className="text-xl font-bold mb-4">
-              {editingResponse ? 'Edit Response' : 'New Response'}
+              {editingResponse ? 'Yanıtı Düzenle' : 'Yeni Yanıt'}
             </h2>
             
             <form onSubmit={handleSubmit}>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Title *
+                    Başlık *
                   </label>
                   <input
                     type="text"
@@ -240,7 +240,7 @@ function CannedResponsesPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Content *
+                    İçerik *
                   </label>
                   <textarea
                     value={formData.content}
@@ -253,21 +253,21 @@ function CannedResponsesPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Shortcut (optional)
+                      Kısayol (opsiyonel)
                     </label>
                     <input
                       type="text"
                       value={formData.shortcut}
                       onChange={(e) => setFormData({ ...formData, shortcut: e.target.value })}
-                      placeholder="/hello"
+                      placeholder="/selam"
                       className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                     />
-                    <p className="text-xs text-gray-500 mt-1">Type this to insert response</p>
+                    <p className="text-xs text-gray-500 mt-1">Yanıtı eklemek için bunu yazın</p>
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Category
+                      Kategori
                     </label>
                     <select
                       value={formData.category}
@@ -291,13 +291,13 @@ function CannedResponsesPage() {
                   }}
                   className="px-4 py-2 border rounded-lg hover:bg-gray-50"
                 >
-                  Cancel
+                  İptal
                 </button>
                 <button
                   type="submit"
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                 >
-                  {editingResponse ? 'Update' : 'Create'}
+                  {editingResponse ? 'Güncelle' : 'Oluştur'}
                 </button>
               </div>
             </form>

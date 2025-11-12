@@ -110,14 +110,14 @@ function WidgetSettingsPage() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Widget Ayarları</h1>
-          <p className="text-gray-600">Customize your chat widget appearance and behavior</p>
+          <p className="text-gray-600">Sohbet widget'ınızın görünümünü ve davranışını özelleştirin</p>
         </div>
         <div className="flex gap-3">
           <button
             onClick={() => window.open('/test-widget.html', '_blank')}
             className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
           >
-            <FiEye /> Preview
+            <FiEye /> Önizleme
           </button>
           <button
             onClick={handleSave}
@@ -140,7 +140,7 @@ function WidgetSettingsPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Primary Color
+                  Birincil Renk
                 </label>
                 <div className="flex gap-2">
                   <input
@@ -160,7 +160,7 @@ function WidgetSettingsPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Secondary Color
+                  İkincil Renk
                 </label>
                 <div className="flex gap-2">
                   <input
@@ -180,33 +180,33 @@ function WidgetSettingsPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Widget Position
+                  Widget Konumu
                 </label>
                 <select
                   value={settings.position}
                   onChange={(e) => updateSetting('position', e.target.value)}
                   className="w-full px-3 py-2 border rounded-lg"
                 >
-                  <option value="bottom-right">Bottom Right</option>
-                  <option value="bottom-left">Bottom Left</option>
-                  <option value="top-right">Top Right</option>
-                  <option value="top-left">Top Left</option>
+                  <option value="bottom-right">Sağ Alt</option>
+                  <option value="bottom-left">Sol Alt</option>
+                  <option value="top-right">Sağ Üst</option>
+                  <option value="top-left">Sol Üst</option>
                 </select>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Language
+                  Dil
                 </label>
                 <select
                   value={settings.language}
                   onChange={(e) => updateSetting('language', e.target.value)}
                   className="w-full px-3 py-2 border rounded-lg"
                 >
-                  <option value="en">English</option>
+                  <option value="en">İngilizce</option>
                   <option value="tr">Türkçe</option>
-                  <option value="es">Español</option>
-                  <option value="fr">Français</option>
+                  <option value="es">İspanyolca</option>
+                  <option value="fr">Fransızca</option>
                   <option value="de">Deutsch</option>
                 </select>
               </div>
@@ -215,12 +215,12 @@ function WidgetSettingsPage() {
 
           {/* Messages */}
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-bold mb-4">Messages</h2>
+            <h2 className="text-xl font-bold mb-4">Mesajlar</h2>
             
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Widget Title
+                  Widget Başlığı
                 </label>
                 <input
                   type="text"
@@ -232,7 +232,7 @@ function WidgetSettingsPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Welcome Message
+                  Hoş Geldin Mesajı
                 </label>
                 <textarea
                   value={settings.welcome_message}
@@ -244,7 +244,7 @@ function WidgetSettingsPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Offline Message
+                  Çevrimdışı Mesajı
                 </label>
                 <textarea
                   value={settings.offline_message}
@@ -256,7 +256,7 @@ function WidgetSettingsPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Input Placeholder
+                  Yazı Alanı Placeholder
                 </label>
                 <input
                   type="text"
@@ -270,7 +270,7 @@ function WidgetSettingsPage() {
 
           {/* Pre-chat Form */}
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-bold mb-4">Pre-chat Form</h2>
+            <h2 className="text-xl font-bold mb-4">Sohbet Öncesi Form</h2>
             
             <div className="space-y-4">
               <label className="flex items-center gap-2">
@@ -280,7 +280,7 @@ function WidgetSettingsPage() {
                   onChange={(e) => updateSetting('enable_pre_chat_form', e.target.checked)}
                   className="w-4 h-4 text-blue-600 rounded"
                 />
-                <span className="text-sm font-medium">Enable pre-chat form</span>
+                <span className="text-sm font-medium">Sohbet öncesi formu etkinleştir</span>
               </label>
 
               {settings.enable_pre_chat_form && (
@@ -292,7 +292,7 @@ function WidgetSettingsPage() {
                       onChange={(e) => updateSetting('pre_chat_name_required', e.target.checked)}
                       className="w-4 h-4 text-blue-600 rounded"
                     />
-                    <span className="text-sm">Require name</span>
+                    <span className="text-sm">İsim zorunlu</span>
                   </label>
 
                   <label className="flex items-center gap-2">
@@ -302,7 +302,7 @@ function WidgetSettingsPage() {
                       onChange={(e) => updateSetting('pre_chat_email_required', e.target.checked)}
                       className="w-4 h-4 text-blue-600 rounded"
                     />
-                    <span className="text-sm">Require email</span>
+                    <span className="text-sm">E-posta zorunlu</span>
                   </label>
 
                   <label className="flex items-center gap-2">
@@ -312,7 +312,7 @@ function WidgetSettingsPage() {
                       onChange={(e) => updateSetting('pre_chat_phone_required', e.target.checked)}
                       className="w-4 h-4 text-blue-600 rounded"
                     />
-                    <span className="text-sm">Require phone</span>
+                    <span className="text-sm">Telefon zorunlu</span>
                   </label>
                 </div>
               )}
@@ -326,7 +326,7 @@ function WidgetSettingsPage() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Auto-show delay (seconds, 0 = disabled)
+                  Otomatik gösterim gecikmesi (saniye, 0 = kapalı)
                 </label>
                 <input
                   type="number"
@@ -344,7 +344,7 @@ function WidgetSettingsPage() {
                   onChange={(e) => updateSetting('show_agent_avatars', e.target.checked)}
                   className="w-4 h-4 text-blue-600 rounded"
                 />
-                <span className="text-sm">Show agent avatars</span>
+                <span className="text-sm">Agent avatarlarını göster</span>
               </label>
 
               <label className="flex items-center gap-2">
@@ -354,7 +354,7 @@ function WidgetSettingsPage() {
                   onChange={(e) => updateSetting('show_typing_indicator', e.target.checked)}
                   className="w-4 h-4 text-blue-600 rounded"
                 />
-                <span className="text-sm">Show typing indicator</span>
+                <span className="text-sm">Yazıyor göstergesini göster</span>
               </label>
 
               <label className="flex items-center gap-2">
@@ -364,7 +364,7 @@ function WidgetSettingsPage() {
                   onChange={(e) => updateSetting('sound_notifications', e.target.checked)}
                   className="w-4 h-4 text-blue-600 rounded"
                 />
-                <span className="text-sm">Sound notifications</span>
+                <span className="text-sm">Sesli bildirimler</span>
               </label>
 
               <label className="flex items-center gap-2">
@@ -374,7 +374,7 @@ function WidgetSettingsPage() {
                   onChange={(e) => updateSetting('show_branding', e.target.checked)}
                   className="w-4 h-4 text-blue-600 rounded"
                 />
-                <span className="text-sm">Show "Powered by AsistTR"</span>
+                <span className="text-sm">"AsistTR tarafından desteklenmektedir" yazısını göster</span>
               </label>
             </div>
           </div>
@@ -383,7 +383,7 @@ function WidgetSettingsPage() {
         {/* Preview Panel */}
         <div className="lg:col-span-1">
           <div className="bg-white rounded-lg shadow p-6 sticky top-8">
-            <h2 className="text-xl font-bold mb-4">Preview</h2>
+            <h2 className="text-xl font-bold mb-4">Önizleme</h2>
             <div className="bg-gray-100 rounded-lg p-4 h-96 relative">
               <div
                 className="absolute w-16 h-16 rounded-full shadow-lg flex items-center justify-center cursor-pointer"
@@ -401,7 +401,7 @@ function WidgetSettingsPage() {
             <div className="mt-4 text-sm text-gray-600">
               <p><strong>Konum:</strong> {settings.position}</p>
               <p><strong>Dil:</strong> {settings.language}</p>
-              <p><strong>Title:</strong> {settings.widget_title}</p>
+              <p><strong>Başlık:</strong> {settings.widget_title}</p>
             </div>
           </div>
         </div>

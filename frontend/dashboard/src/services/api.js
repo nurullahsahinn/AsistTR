@@ -142,6 +142,9 @@ export const voiceApi = {
   
   getActiveCalls: (siteId) =>
     api.get('/voice/active', { params: { siteId } }),
+  
+  getCallHistory: (conversationId) =>
+    api.get(`/voice/conversation/${conversationId}/history`),
 }
 
 // Canned Responses API
@@ -187,6 +190,64 @@ export const notificationApi = {
   getNotifications: (params) => api.get('/notifications', { params }),
   markAsRead: (notificationId) => api.put(`/notifications/${notificationId}/read`),
   markAllAsRead: () => api.put('/notifications/read-all'),
+}
+
+// Chat Enhancement API (Tags, Notes, Ratings, Transfer)
+export const chatEnhancementApi = {
+  // Tags
+  getTags: (siteId) => api.get('/chat/tags', { params: { siteId } }),
+  createTag: (data) => api.post('/chat/tags', data),
+  addTagToConversation: (conversationId, tagId) => api.post('/chat/tags/add', { conversationId, tagId }),
+  removeTagFromConversation: (conversationId, tagId) => api.delete(`/chat/tags/${conversationId}/${tagId}`),
+  getConversationTags: (conversationId) => api.get(`/chat/${conversationId}/tags`),
+  
+  // Notes
+  getConversationNotes: (conversationId) => api.get(`/chat/${conversationId}/notes`),
+  createNote: (conversationId, note) => api.post(`/chat/${conversationId}/notes`, { note }),
+  updateNote: (noteId, note) => api.put(`/chat/notes/${noteId}`, { note }),
+  deleteNote: (noteId) => api.delete(`/chat/notes/${noteId}`),
+  
+  // Ratings
+  submitRating: (conversationId, rating, comment) => api.post(`/chat/${conversationId}/rating`, { rating, comment }),
+  
+  // Transfer
+  transferConversation: (conversationId, targetAgentId, targetDepartmentId) => 
+    api.post(`/chat/${conversationId}/transfer`, { targetAgentId, targetDepartmentId }),
+}
+
+// Queue API
+export const queueApi = {
+  getQueueStatus: (siteId) => api.get('/queue/status', { params: { siteId } }),
+  removeFromQueue: (queueId) => api.delete(`/queue/${queueId}`),
+  getQueueStats: (siteId, period = '7d') => api.get('/queue/stats', { params: { siteId, period } }),
+}
+
+// Offline Messages API
+export const offlineMessageApi = {
+  getOfflineMessages: (siteId, status = 'pending') => api.get('/offline-messages', { params: { siteId, status } }),
+  updateMessageStatus: (messageId, status) => api.put(`/offline-messages/${messageId}/status`, { status }),
+  deleteOfflineMessage: (messageId) => api.delete(`/offline-messages/${messageId}`),
+}
+
+// Presence API
+export const presenceApi = {
+  getAgents: (siteId) => api.get('/presence/agents', { params: { siteId } }),
+  updateStatus: (status) => api.post('/presence/status', { status }),
+}
+
+// Agent State API (Break management)
+export const agentStateApi = {
+  getAgentState: () => api.get('/agent-state/state'),
+  updateAgentState: (state, reason) => api.put('/agent-state/state', { state, reason }),
+  getAllAgentsStates: (siteId) => api.get('/agent-state/states/all', { params: { siteId } }),
+  startBreak: (breakType, reason) => api.post('/agent-state/break/start', { breakType, reason }),
+  endBreak: () => api.post('/agent-state/break/end'),
+}
+
+// Metrics API
+export const metricsApi = {
+  getConversationMetrics: (conversationId) => api.get(`/metrics/conversation/${conversationId}`),
+  getAgentMetrics: (agentId, period = '7d') => api.get(`/metrics/agent/${agentId}`, { params: { period } }),
 }
 
 // Export both named and default

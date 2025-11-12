@@ -6,7 +6,7 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
 import { useEffect } from 'react'
 import { useAuthStore } from '../store/authStore'
-import { FiMessageSquare, FiBook, FiSettings, FiLogOut, FiHome, FiUsers, FiBriefcase, FiFileText, FiBarChart2, FiLayout, FiBell } from 'react-icons/fi'
+import { FiMessageSquare, FiBook, FiSettings, FiLogOut, FiHome, FiUsers, FiBriefcase, FiFileText, FiBarChart2, FiLayout, FiBell, FiInbox, FiList, FiClock } from 'react-icons/fi'
 import AgentStatusSelector from './AgentStatusSelector'
 import socketService from '../services/socket'
 import { voiceApi } from '../services/api'
@@ -49,6 +49,9 @@ function DashboardLayout() {
   let menuItems = [
     { path: '/', icon: FiHome, label: 'Ana Sayfa' },
     { path: '/chat', icon: FiMessageSquare, label: 'Sohbetler' },
+    { path: '/queue', icon: FiList, label: 'Kuyruk' },
+    { path: '/agent-state', icon: FiClock, label: 'Durum Yönetimi' },
+    { path: '/offline-messages', icon: FiInbox, label: 'Gelen Kutusu' },
     { path: '/canned-responses', icon: FiFileText, label: 'Hazır Yanıtlar' },
     { path: '/analytics', icon: FiBarChart2, label: 'Analitik' },
     { path: '/notifications', icon: FiBell, label: 'Bildirimler' },
@@ -70,7 +73,7 @@ function DashboardLayout() {
       <aside className="w-64 bg-white shadow-lg">
         <div className="p-6">
           <h1 className="text-2xl font-bold text-primary-600">AsistTR</h1>
-          <p className="text-sm text-gray-500 mt-1">Admin Panel</p>
+          <p className="text-sm text-gray-500 mt-1">Yönetim Paneli</p>
         </div>
 
         <nav className="mt-6">

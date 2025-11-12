@@ -7,10 +7,11 @@ function VoiceCallPanel({
   onAccept, 
   onReject, 
   onEnd,
+  onMuteToggle,
   callStatus = 'idle',
-  duration = 0 
+  duration = 0,
+  isMuted = false
 }) {
-  const [isMuted, setIsMuted] = useState(false)
   const [isSpeakerOff, setIsSpeakerOff] = useState(false)
   const audioRef = useRef(null)
 
@@ -39,9 +40,11 @@ function VoiceCallPanel({
   }
 
   const handleMuteToggle = () => {
-    setIsMuted(!isMuted)
-    // TODO: Implement actual mute functionality
-    toast.info(isMuted ? '🎤 Mikrofon açık' : '🔇 Mikrofon kapalı')
+    if (onMuteToggle) {
+      onMuteToggle()
+    } else {
+      toast.info('Mute fonksiyonu kullanılamıyor')
+    }
   }
 
   const handleSpeakerToggle = () => {
@@ -159,5 +162,10 @@ function VoiceCallPanel({
 }
 
 export default VoiceCallPanel
+
+
+
+
+
 
 

@@ -29,7 +29,7 @@ export default function AgentsPage() {
       const response = await api.get('/agents');
       setAgents(response.data.agents || []);
     } catch (error) {
-      toast.error('Failed to fetch agents');
+      toast.error('Agent\'lar getirilemedi');
       console.error(error);
     } finally {
       setLoading(false);
@@ -41,7 +41,7 @@ export default function AgentsPage() {
       const response = await api.get('/departments');
       setDepartments(response.data.departments || []);
     } catch (error) {
-      console.error('Failed to fetch departments:', error);
+      console.error('Departmanlar getirilemedi:', error);
     }
   };
 
@@ -51,23 +51,23 @@ export default function AgentsPage() {
     const payload = {
       ...formData,
       skills: formData.skills ? formData.skills.split(',').map(s => s.trim()) : [],
-      department_id: formData.department_id ? parseInt(formData.department_id) : null
+      department_id: formData.department_id || null
     };
 
     try {
       if (editingAgent) {
         await api.put(`/agents/${editingAgent.id}`, payload);
-        toast.success('Agent updated successfully');
+        toast.success('Agent başarıyla güncellendi');
       } else {
         await api.post('/agents', payload);
-        toast.success('Agent created successfully');
+        toast.success('Agent başarıyla oluşturuldu');
       }
       
       setShowModal(false);
       resetForm();
       fetchAgents();
     } catch (error) {
-      toast.error(error.response?.data?.error || 'Operation failed');
+      toast.error(error.response?.data?.error || 'İşlem başarısız');
     }
   };
 
@@ -87,14 +87,14 @@ export default function AgentsPage() {
   };
 
   const handleDelete = async (agentId) => {
-    if (!confirm('Are you sure you want to delete this agent?')) return;
+    if (!confirm('Bu agent\'ı silmek istediğinizden emin misiniz?')) return;
     
     try {
       await api.delete(`/agents/${agentId}`);
-      toast.success('Agent deleted successfully');
+      toast.success('Agent başarıyla silindi');
       fetchAgents();
     } catch (error) {
-      toast.error(error.response?.data?.error || 'Failed to delete agent');
+      toast.error(error.response?.data?.error || 'Agent silinemedi');
     }
   };
 
@@ -133,12 +133,12 @@ export default function AgentsPage() {
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Agents Management</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Agent Yönetimi</h1>
         <button
           onClick={() => { resetForm(); setShowModal(true); }}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
-          + Add Agent
+          + Agent Ekle
         </button>
       </div>
 
@@ -150,19 +150,19 @@ export default function AgentsPage() {
                 Agent
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Department
+                Departman
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
+                Durum
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Chats
+                Sohbetler
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Skills
+                Yetenekler
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
+                Eylemler
               </th>
             </tr>
           </thead>
@@ -203,13 +203,13 @@ export default function AgentsPage() {
                     onClick={() => handleEdit(agent)}
                     className="text-blue-600 hover:text-blue-900 mr-4"
                   >
-                    Edit
+                    Düzenle
                   </button>
                   <button
                     onClick={() => handleDelete(agent.id)}
                     className="text-red-600 hover:text-red-900"
                   >
-                    Delete
+                    Sil
                   </button>
                 </td>
               </tr>
@@ -219,7 +219,7 @@ export default function AgentsPage() {
 
         {agents.length === 0 && (
           <div className="text-center py-12 text-gray-500">
-            No agents found. Create your first agent to get started.
+            Agent bulunamadı. Başlamak için ilk agent'ınızı oluşturun.
           </div>
         )}
       </div>
@@ -230,13 +230,13 @@ export default function AgentsPage() {
           <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
             <div className="mb-4">
               <h3 className="text-lg font-medium leading-6 text-gray-900">
-                {editingAgent ? 'Edit Agent' : 'Add New Agent'}
+                {editingAgent ? 'Agent Düzenle' : 'Yeni Agent Ekle'}
               </h3>
             </div>
             
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Name</label>
+                <label className="block text-sm font-medium text-gray-700">İsim</label>
                 <input
                   type="text"
                   required
@@ -247,7 +247,7 @@ export default function AgentsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">Email</label>
+                <label className="block text-sm font-medium text-gray-700">E-posta</label>
                 <input
                   type="email"
                   required
@@ -259,7 +259,7 @@ export default function AgentsPage() {
 
               {!editingAgent && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Password</label>
+                  <label className="block text-sm font-medium text-gray-700">Şifre</label>
                   <input
                     type="password"
                     required={!editingAgent}
@@ -271,7 +271,7 @@ export default function AgentsPage() {
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">Role</label>
+                <label className="block text-sm font-medium text-gray-700">Rol</label>
                 <select
                   value={formData.role}
                   onChange={(e) => setFormData({ ...formData, role: e.target.value })}
@@ -283,13 +283,13 @@ export default function AgentsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">Department</label>
+                <label className="block text-sm font-medium text-gray-700">Departman</label>
                 <select
                   value={formData.department_id}
                   onChange={(e) => setFormData({ ...formData, department_id: e.target.value })}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 >
-                  <option value="">No Department</option>
+                  <option value="">Departman Yok</option>
                   {departments.map((dept) => (
                     <option key={dept.id} value={dept.id}>
                       {dept.name}
@@ -299,7 +299,7 @@ export default function AgentsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">Max Chats</label>
+                <label className="block text-sm font-medium text-gray-700">Maks. Sohbet</label>
                 <input
                   type="number"
                   min="1"
@@ -311,12 +311,12 @@ export default function AgentsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">Skills (comma-separated)</label>
+                <label className="block text-sm font-medium text-gray-700">Yetenekler (virgülle ayırın)</label>
                 <input
                   type="text"
                   value={formData.skills}
                   onChange={(e) => setFormData({ ...formData, skills: e.target.value })}
-                  placeholder="e.g. Technical Support, Billing, Sales"
+                  placeholder="örn. Teknik Destek, Faturalandırma, Satış"
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 />
               </div>
@@ -328,7 +328,7 @@ export default function AgentsPage() {
                   onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
-                <label className="ml-2 block text-sm text-gray-900">Active</label>
+                <label className="ml-2 block text-sm text-gray-900">Aktif</label>
               </div>
 
               <div className="flex justify-end space-x-2 mt-6">
@@ -337,13 +337,13 @@ export default function AgentsPage() {
                   onClick={() => { setShowModal(false); resetForm(); }}
                   className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400"
                 >
-                  Cancel
+                  İptal
                 </button>
                 <button
                   type="submit"
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                 >
-                  {editingAgent ? 'Update' : 'Create'}
+                  {editingAgent ? 'Güncelle' : 'Oluştur'}
                 </button>
               </div>
             </form>

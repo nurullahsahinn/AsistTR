@@ -267,40 +267,117 @@ import { io } from 'socket.io-client'
         transform: scale(1.1);
       }
 
-      #asistr-welcome-form {
+      /* Initial Screen & Forms */
+      .asistr-screen {
         padding: 24px;
-        display: flex;
+        display: none; /* Hide all screens by default */
         flex-direction: column;
         gap: 16px;
+        animation: fadeIn 0.3s ease-in-out;
+        height: 100%;
+        justify-content: center;
+      }
+      .asistr-screen.active {
+        display: flex;
+      }
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
       }
 
-      #asistr-welcome-form input {
+      .asistr-screen h4 {
+        margin: 0 0 8px 0;
+        color: #1f2937;
+        font-size: 18px;
+        font-weight: 600;
+        text-align: center;
+      }
+
+      .asistr-screen p {
+        margin: 0 0 16px 0;
+        color: #6b7280;
+        font-size: 14px;
+        text-align: center;
+      }
+      
+      .asistr-initial-btn {
+        padding: 16px;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        text-align: left;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        background: #f9fafb;
+        width: 100%;
+      }
+      .asistr-initial-btn:hover {
+        background: white;
+        border-color: #0284c7;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      }
+      .asistr-initial-btn strong {
+        display: block;
+        font-size: 15px;
+        color: #1f2937;
+        margin-bottom: 4px;
+      }
+      .asistr-initial-btn span {
+        font-size: 13px;
+        color: #6b7280;
+      }
+      
+      .asistr-form-group input, .asistr-form-group textarea {
+        width: 100%;
         padding: 12px;
         border: 1px solid #e5e7eb;
         border-radius: 8px;
         font-size: 14px;
         outline: none;
         transition: border-color 0.2s;
+        box-sizing: border-box;
       }
-
-      #asistr-welcome-form input:focus {
+      
+      .asistr-form-group input:focus, .asistr-form-group textarea:focus {
         border-color: #0284c7;
       }
 
-      #asistr-welcome-form button {
+      .asistr-form-group textarea {
+        resize: vertical;
+        min-height: 80px;
+      }
+      
+      .asistr-form-buttons {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+      }
+
+      .asistr-form-buttons button {
+        flex: 1;
         padding: 12px;
-        background: #0284c7;
-        color: white;
-        border: none;
         border-radius: 8px;
         font-size: 14px;
         font-weight: 600;
         cursor: pointer;
         transition: background 0.2s;
+        border: none;
       }
-
-      #asistr-welcome-form button:hover {
+      
+      .asistr-form-buttons .submit-btn {
+        background: #0284c7;
+        color: white;
+      }
+      .asistr-form-buttons .submit-btn:hover {
         background: #0369a1;
+      }
+      
+      .asistr-form-buttons .back-btn {
+        background: #e5e7eb;
+        color: #374151;
+      }
+       .asistr-form-buttons .back-btn:hover {
+        background: #d1d5db;
       }
 
       #asistr-messages {
@@ -676,13 +753,59 @@ import { io } from 'socket.io-client'
           <button id="asistr-close">×</button>
         </div>
 
-        <!-- Welcome Form -->
-        <div id="asistr-welcome-form">
-          <h4 style="margin: 0 0 8px 0; color: #1f2937;">Hoş geldiniz! 👋</h4>
-          <p style="margin: 0 0 16px 0; color: #6b7280; font-size: 14px;">Size nasıl yardımcı olabiliriz?</p>
-          <input type="text" id="asistr-name" placeholder="Adınız" required />
-          <input type="email" id="asistr-email" placeholder="E-posta (opsiyonel)" />
-          <button id="asistr-start-chat">Sohbet Başlat</button>
+        <!-- Initial Screen -->
+        <div id="asistr-initial-screen" class="asistr-screen active">
+            <h4>Merhaba! 👋</h4>
+            <p>Size nasıl yardımcı olabiliriz?</p>
+            <button id="asistr-show-chat-form" class="asistr-initial-btn">
+              <strong>🤖 AI ile Hemen Sohbet Et</strong>
+              <span>Anlık cevaplar ve hızlı bilgi için</span>
+            </button>
+            <button id="asistr-show-offline-form" class="asistr-initial-btn">
+              <strong>👨‍💼 Yetkiliye Mesaj Bırak</strong>
+              <span>Detaylı sorularınız ve özel talepleriniz için</span>
+            </button>
+        </div>
+
+        <!-- Chat Welcome Form -->
+        <form id="asistr-chat-form" class="asistr-screen">
+          <h4>Sohbeti Başlat</h4>
+          <p>Devam etmek için bilgilerinizi girin.</p>
+          <div class="asistr-form-group">
+            <input type="text" id="asistr-name" placeholder="Adınız" required />
+          </div>
+          <div class="asistr-form-group">
+            <input type="email" id="asistr-email" placeholder="E-posta (opsiyonel)" />
+          </div>
+          <div class="asistr-form-buttons">
+            <button type="button" class="back-btn">Geri</button>
+            <button type="submit" class="submit-btn">Sohbet Başlat</button>
+          </div>
+        </form>
+
+        <!-- Offline Message Form -->
+        <form id="asistr-offline-form" class="asistr-screen">
+          <h4>Mesaj Bırakın</h4>
+          <p>En kısa sürede size geri döneceğiz.</p>
+          <div class="asistr-form-group">
+            <input type="text" id="asistr-offline-name" placeholder="Adınız" required />
+          </div>
+          <div class="asistr-form-group">
+            <input type="email" id="asistr-offline-email" placeholder="E-posta" required />
+          </div>
+          <div class="asistr-form-group">
+            <textarea id="asistr-offline-message" placeholder="Mesajınız..." required></textarea>
+          </div>
+           <div class="asistr-form-buttons">
+            <button type="button" class="back-btn">Geri</button>
+            <button type="submit" class="submit-btn">Gönder</button>
+          </div>
+        </form>
+
+        <!-- Success/Thanks Screen -->
+        <div id="asistr-thanks-screen" class="asistr-screen">
+            <h4>Teşekkürler! 🙏</h4>
+            <p>Mesajınız bize ulaştı. En kısa sürede size belirttiğiniz e-posta adresinden dönüş yapacağız.</p>
         </div>
 
         <!-- Messages Area -->
@@ -752,7 +875,17 @@ import { io } from 'socket.io-client'
     // Event listener'lar
     document.getElementById('asistr-bubble').addEventListener('click', toggleChat)
     document.getElementById('asistr-close').addEventListener('click', toggleChat)
-    document.getElementById('asistr-start-chat').addEventListener('click', startChat)
+    document.getElementById('asistr-show-chat-form').addEventListener('click', () => showScreen('asistr-chat-form'))
+    document.getElementById('asistr-show-offline-form').addEventListener('click', () => showScreen('asistr-offline-form'))
+    
+    document.getElementById('asistr-chat-form').addEventListener('submit', startChat)
+    document.getElementById('asistr-offline-form').addEventListener('submit', submitOfflineMessage)
+
+    // Add back button listeners
+    document.querySelectorAll('.back-btn').forEach(btn => {
+      btn.addEventListener('click', () => showScreen('asistr-initial-screen'))
+    })
+
     document.getElementById('asistr-input-form').addEventListener('submit', sendMessage)
     document.getElementById('asistr-attach-btn').addEventListener('click', () => {
       document.getElementById('asistr-file-input').click();
@@ -812,27 +945,43 @@ import { io } from 'socket.io-client'
     if (isOpen) {
       chatWindow.classList.add('open')
       
-      // ✅ Eğer kayıtlı conversation varsa direkt chat göster, form gösterme
       const savedConversationId = localStorage.getItem('asistr_conversation_id')
       const savedVisitorName = localStorage.getItem('asistr_visitor_name')
       
       if (savedConversationId && savedVisitorName) {
-        console.log('✅ Restoring previous session:', savedConversationId)
-        
-        // Form'u gizle, chat'i göster
-        document.getElementById('asistr-welcome-form').style.display = 'none'
-        document.getElementById('asistr-messages').classList.add('active')
-        document.getElementById('asistr-input-area').classList.add('active')
-        
-        // Socket bağlantısı kur (eski conversation'a bağlanacak)
+        console.log('✅ Önceki oturum geri yükleniyor:', savedConversationId)
+        showScreen('asistr-messages')
         connectSocket({ name: savedVisitorName, email: localStorage.getItem('asistr_visitor_email') || '' })
+      } else {
+        showScreen('asistr-initial-screen')
       }
     } else {
       chatWindow.classList.remove('open')
     }
   }
 
-  function startChat() {
+  function showScreen(screenId) {
+    const screens = ['asistr-initial-screen', 'asistr-chat-form', 'asistr-offline-form', 'asistr-thanks-screen', 'asistr-messages'];
+    screens.forEach(id => {
+      const screen = document.getElementById(id);
+      if (id === screenId) {
+        screen.classList.add('active');
+      } else {
+        screen.classList.remove('active');
+      }
+    });
+
+    // Also toggle input area visibility
+    const inputArea = document.getElementById('asistr-input-area');
+    if (screenId === 'asistr-messages') {
+      inputArea.classList.add('active');
+    } else {
+      inputArea.classList.remove('active');
+    }
+  }
+
+  function startChat(e) {
+    e.preventDefault();
     const name = document.getElementById('asistr-name').value.trim()
     const email = document.getElementById('asistr-email').value.trim()
 
@@ -841,15 +990,51 @@ import { io } from 'socket.io-client'
       return
     }
 
-    // Socket bağlantısı kur
     connectSocket({ name, email })
-
-    // UI'yi değiştir
-    document.getElementById('asistr-welcome-form').style.display = 'none'
-    document.getElementById('asistr-messages').classList.add('active')
-    document.getElementById('asistr-input-area').classList.add('active')
-
+    showScreen('asistr-messages')
     addMessage('agent', `Merhaba ${name}! Size nasıl yardımcı olabilirim?`)
+  }
+
+  async function submitOfflineMessage(e) {
+    e.preventDefault();
+    const name = document.getElementById('asistr-offline-name').value.trim();
+    const email = document.getElementById('asistr-offline-email').value.trim();
+    const message = document.getElementById('asistr-offline-message').value.trim();
+    const submitBtn = e.target.querySelector('.submit-btn');
+
+    if (!name || !email || !message) {
+      alert('Lütfen tüm zorunlu alanları doldurun.');
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Gönderiliyor...';
+
+    try {
+      const response = await fetch(`${API_URL}/api/offline-messages/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          apiKey: API_KEY,
+          name,
+          email,
+          message
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Mesaj gönderilemedi.');
+      }
+
+      showScreen('asistr-thanks-screen');
+
+    } catch (error) {
+      console.error('Offline mesaj gönderme hatası:', error);
+      alert('Mesajınız gönderilirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Gönder';
+    }
   }
 
   function connectSocket(visitorInfo) {
@@ -957,6 +1142,12 @@ import { io } from 'socket.io-client'
       endVoiceCall();
     });
 
+    socket.on('conversation:ended', (data) => {
+      console.log('Konuşma sonlandırıldı:', data);
+      // Puanlama modal'ını aç
+      showRatingModal();
+    });
+
     socket.on('disconnect', () => {
       console.log('Socket bağlantısı kesildi')
       if (isInCall) {
@@ -999,8 +1190,10 @@ import { io } from 'socket.io-client'
     try {
       const response = await fetch(`${API_URL}/api/upload`, {
         method: 'POST',
-        body: formData,
-        // Auth token'i eklememiz gerekebilir, ama şimdilik public yapalım
+        headers: {
+          'X-API-Key': API_KEY
+        },
+        body: formData
       });
 
       if (!response.ok) {
@@ -1540,24 +1733,27 @@ import { io } from 'socket.io-client'
   
   async function submitRating() {
     if (selectedRating === 0) {
-      alert('Lütfen bir yıldız seçin');
+      alert('Lütfen bir puan seçin.');
       return;
     }
-    
+
     const feedback = document.getElementById('asistr-feedback').value.trim();
-    
+
     try {
       const response = await fetch(`${API_URL}/api/chat/${conversationId}/rate`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rating: selectedRating, feedback })
+        headers: {
+          'Content-Type': 'application/json',
+          // Visitor'a özel bir token varsa eklenmeli
+        },
+        body: JSON.stringify({ rating: selectedRating, feedback: feedback }) // feedback eklendi
       });
-      
+
       if (response.ok) {
         closeRatingModal();
-        addMessage('agent', 'Teşekkürler! Geri bildiriminiz kaydedildi. 🙏');
+        addMessage('system', `Değerlendirmeniz için teşekkürler! Puanınız: ${selectedRating} yıldız.`);
       } else {
-        alert('Değerlendirme gönderilemedi.');
+        throw new Error('Rating failed');
       }
     } catch (error) {
       console.error('Rating error:', error);

@@ -15,6 +15,9 @@ import CannedResponsesPage from './pages/CannedResponsesPage'
 import AnalyticsPage from './pages/AnalyticsPage'
 import WidgetSettingsPage from './pages/WidgetSettingsPage'
 import NotificationSettingsPage from './pages/NotificationSettingsPage'
+import OfflineMessagesPage from './pages/OfflineMessagesPage'
+import QueuePage from './pages/QueuePage'
+import AgentStatePage from './pages/AgentStatePage'
 
 // Layout
 import DashboardLayout from './components/DashboardLayout'
@@ -46,6 +49,9 @@ function App() {
             <Route path="notifications" element={<NotificationSettingsPage />} />
             <Route path="knowledge" element={<KnowledgePage />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="offline-messages" element={<OfflineMessagesPage />} />
+            <Route path="queue" element={<QueuePage />} />
+            <Route path="agent-state" element={<AgentStatePage />} />
           </Route>
         </Routes>
       </BrowserRouter>

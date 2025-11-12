@@ -22,7 +22,7 @@ export default function DepartmentsPage() {
       const response = await api.get('/departments');
       setDepartments(response.data.departments || []);
     } catch (error) {
-      toast.error('Failed to fetch departments');
+      toast.error('Departmanlar getirilemedi');
       console.error(error);
     } finally {
       setLoading(false);
@@ -35,17 +35,17 @@ export default function DepartmentsPage() {
     try {
       if (editingDept) {
         await api.put(`/departments/${editingDept.id}`, formData);
-        toast.success('Department updated successfully');
+        toast.success('Departman başarıyla güncellendi');
       } else {
         await api.post('/departments', formData);
-        toast.success('Department created successfully');
+        toast.success('Departman başarıyla oluşturuldu');
       }
       
       setShowModal(false);
       resetForm();
       fetchDepartments();
     } catch (error) {
-      toast.error(error.response?.data?.error || 'Operation failed');
+      toast.error(error.response?.data?.error || 'İşlem başarısız');
     }
   };
 
@@ -60,14 +60,14 @@ export default function DepartmentsPage() {
   };
 
   const handleDelete = async (deptId) => {
-    if (!confirm('Are you sure you want to delete this department?')) return;
+    if (!confirm('Bu departmanı silmek istediğinizden emin misiniz?')) return;
     
     try {
       await api.delete(`/departments/${deptId}`);
-      toast.success('Department deleted successfully');
+      toast.success('Departman başarıyla silindi');
       fetchDepartments();
     } catch (error) {
-      toast.error(error.response?.data?.error || 'Failed to delete department');
+      toast.error(error.response?.data?.error || 'Departman silinemedi');
     }
   };
 
@@ -91,12 +91,12 @@ export default function DepartmentsPage() {
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Departments</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Departmanlar</h1>
         <button
           onClick={() => { resetForm(); setShowModal(true); }}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
-          + Add Department
+          + Departman Ekle
         </button>
       </div>
 
@@ -108,30 +108,44 @@ export default function DepartmentsPage() {
               <span className={`px-2 py-1 text-xs rounded-full ${
                 dept.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
               }`}>
-                {dept.is_active ? 'Active' : 'Inactive'}
+                {dept.is_active ? 'Aktif' : 'Pasif'}
               </span>
             </div>
             
             <p className="text-sm text-gray-600 mb-4">
-              {dept.description || 'No description'}
+              {dept.description || 'Açıklama yok'}
             </p>
             
+            {/* Agent Avatars */}
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-500">
-                {dept.agent_count || 0} agents
-              </span>
+              <div className="flex -space-x-2">
+                {dept.agents && dept.agents.map(agent => (
+                  <img
+                    key={agent.id}
+                    className="inline-block h-8 w-8 rounded-full ring-2 ring-white"
+                    src={agent.avatar_url || `https://ui-avatars.com/api/?name=${agent.name}&background=random`}
+                    alt={agent.name}
+                    title={agent.name}
+                  />
+                ))}
+                {(!dept.agents || dept.agents.length === 0) && (
+                  <span className="text-sm text-gray-500">
+                    Agent atanmamış
+                  </span>
+                )}
+              </div>
               <div className="space-x-2">
                 <button
                   onClick={() => handleEdit(dept)}
                   className="text-sm text-blue-600 hover:text-blue-900"
                 >
-                  Edit
+                  Düzenle
                 </button>
                 <button
                   onClick={() => handleDelete(dept.id)}
                   className="text-sm text-red-600 hover:text-red-900"
                 >
-                  Delete
+                  Sil
                 </button>
               </div>
             </div>
@@ -141,7 +155,7 @@ export default function DepartmentsPage() {
 
       {departments.length === 0 && (
         <div className="text-center py-12 text-gray-500 bg-white rounded-lg">
-          No departments found. Create your first department to get started.
+          Departman bulunamadı. Başlamak için ilk departmanınızı oluşturun.
         </div>
       )}
 
@@ -151,13 +165,13 @@ export default function DepartmentsPage() {
           <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
             <div className="mb-4">
               <h3 className="text-lg font-medium leading-6 text-gray-900">
-                {editingDept ? 'Edit Department' : 'Add New Department'}
+                {editingDept ? 'Departmanı Düzenle' : 'Yeni Departman Ekle'}
               </h3>
             </div>
             
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Name</label>
+                <label className="block text-sm font-medium text-gray-700">İsim</label>
                 <input
                   type="text"
                   required
@@ -168,7 +182,7 @@ export default function DepartmentsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">Description</label>
+                <label className="block text-sm font-medium text-gray-700">Açıklama</label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -184,7 +198,7 @@ export default function DepartmentsPage() {
                   onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
-                <label className="ml-2 block text-sm text-gray-900">Active</label>
+                <label className="ml-2 block text-sm text-gray-900">Aktif</label>
               </div>
 
               <div className="flex justify-end space-x-2 mt-6">
@@ -193,13 +207,13 @@ export default function DepartmentsPage() {
                   onClick={() => { setShowModal(false); resetForm(); }}
                   className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400"
                 >
-                  Cancel
+                  İptal
                 </button>
                 <button
                   type="submit"
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                 >
-                  {editingDept ? 'Update' : 'Create'}
+                  {editingDept ? 'Güncelle' : 'Oluştur'}
                 </button>
               </div>
             </form>

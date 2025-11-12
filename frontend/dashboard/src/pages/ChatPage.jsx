@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
-import { chatApi, ragApi, api } from '../services/api'
+import { chatApi, ragApi, api, voiceApi } from '../services/api'
 import { useAuthStore } from '../store/authStore'
 import { useChatStore } from '../store/chatStore'
 import socketService from '../services/socket'
 import toast from 'react-hot-toast'
-import { FiSend, FiZap, FiXCircle, FiTrash2, FiPaperclip, FiDownload, FiRefreshCw, FiTag, FiFileText, FiStar, FiUsers, FiPhone, FiPhoneOff, FiPhoneIncoming } from 'react-icons/fi'
+import { FiSend, FiZap, FiXCircle, FiTrash2, FiPaperclip, FiDownload, FiRefreshCw, FiTag, FiFileText, FiStar, FiUsers, FiPhone, FiPhoneOff, FiPhoneIncoming, FiPhoneMissed } from 'react-icons/fi'
 import { formatDistanceToNow } from 'date-fns'
 import { tr } from 'date-fns/locale'
 import { userApi } from '../services/api'
@@ -178,6 +178,41 @@ const formatInlineMarkdown = (text, isBot) => {
   return parts.length === 1 && typeof parts[0] === 'string' ? parts[0] : parts;
 };
 
+// WhatsApp tarzı arama kaydı bileşeni
+const CallRecord = ({ call }) => {
+  const getCallIcon = () => {
+    if (call.status === 'missed') return <FiPhoneMissed className="text-red-500" />;
+    if (call.status === 'ended') return <FiPhone className="text-green-500" />;
+    return <FiPhoneIncoming className="text-blue-500" />;
+  };
+
+  const getCallText = () => {
+    if (call.status === 'missed') return 'Cevapsız Arama';
+    if (call.status === 'ended' && call.duration) {
+      const minutes = Math.floor(call.duration / 60);
+      const seconds = call.duration % 60;
+      return `Sesli Arama (${minutes > 0 ? `${minutes}d ` : ''}${seconds}s)`;
+    }
+    return 'Sesli Arama';
+  };
+
+  const getCallTime = () => {
+    const time = call.start_time || call.end_time;
+    if (!time) return '';
+    return new Date(time).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+  };
+
+  return (
+    <div className="flex justify-center my-4">
+      <div className="bg-gray-100 rounded-lg px-4 py-2 flex items-center gap-2 text-sm">
+        {getCallIcon()}
+        <span className="text-gray-700">{getCallText()}</span>
+        <span className="text-gray-500 text-xs">{getCallTime()}</span>
+      </div>
+    </div>
+  );
+};
+
 function ChatPage() {
   const { user } = useAuthStore()
   const { 
@@ -208,6 +243,8 @@ function ChatPage() {
   const [showRating, setShowRating] = useState(false);
   const [agents, setAgents] = useState([]);
   const [showTransfer, setShowTransfer] = useState(false);
+  const [selectedAgentForTransfer, setSelectedAgentForTransfer] = useState('');
+  const [callHistory, setCallHistory] = useState([]); // Arama geçmişi
   
   // Voice call state
   const [incomingCall, setIncomingCall] = useState(null);
@@ -216,6 +253,7 @@ function ChatPage() {
   const [localStream, setLocalStream] = useState(null);
   const [callStatus, setCallStatus] = useState('idle'); // idle, ringing, connecting, connected
   const [callDuration, setCallDuration] = useState(0); // Arama süresi (saniye)
+  const [isMuted, setIsMuted] = useState(false); // Mikrofon mute durumu
   const callTimerRef = useRef(null);
   
   const messagesEndRef = useRef(null)
@@ -365,6 +403,11 @@ function ChatPage() {
       console.log('Call ended:', data);
       setIncomingCall(null); // ✅ Incoming call'u temizle
       endCall();
+      
+      // ✅ Arama geçmişini yeniden yükle
+      if (activeConversation) {
+        loadCallHistory(activeConversation);
+      }
     };
 
     // Listener'ları ekle
@@ -453,6 +496,7 @@ function ChatPage() {
       // Load additional data
       loadConversationTags(conversationId)
       loadConversationNotes(conversationId)
+      loadCallHistory(conversationId) // Arama geçmişini yükle
     } catch (error) {
       toast.error('Mesajlar yüklenemedi')
     }
@@ -614,7 +658,7 @@ function ChatPage() {
   // Load conversation tags
   const loadConversationTags = async (conversationId) => {
     try {
-      const { data } = await api.get(`/api/chat-enhancement/conversations/${conversationId}/tags`);
+      const { data } = await api.get(`/chat-enhancement/conversations/${conversationId}/tags`);
       setConversationTags(data.tags || []);
       
       // Also load all available tags if not loaded
@@ -635,27 +679,27 @@ function ChatPage() {
         tagId
       });
       loadConversationTags(activeConversation);
-      toast.success('Tag added');
+      toast.success('Etiket eklendi');
     } catch (error) {
-      toast.error(error.response?.data?.error || 'Failed to add tag');
+      toast.error(error.response?.data?.error || 'Etiket eklenemedi');
     }
   };
 
   // Remove tag
   const removeTag = async (tagId) => {
     try {
-      await api.delete(`/api/chat-enhancement/tags/${activeConversation}/${tagId}`);
+      await api.delete(`/chat-enhancement/tags/${activeConversation}/${tagId}`);
       loadConversationTags(activeConversation);
-      toast.success('Tag removed');
+      toast.success('Etiket kaldırıldı');
     } catch (error) {
-      toast.error('Failed to remove tag');
+      toast.error('Etiket kaldırılamadı');
     }
   };
 
   // Load conversation notes
   const loadConversationNotes = async (conversationId) => {
     try {
-      const { data } = await api.get(`/api/chat-enhancement/conversations/${conversationId}/notes`);
+      const { data } = await api.get(`/chat-enhancement/conversations/${conversationId}/notes`);
       setNotes(data.notes || []);
     } catch (error) {
       console.error('Failed to load notes:', error);
@@ -667,43 +711,51 @@ function ChatPage() {
     if (!noteText.trim()) return;
     
     try {
-      await api.post(`/api/chat-enhancement/conversations/${activeConversation}/notes`, {
+      await api.post(`/chat-enhancement/conversations/${activeConversation}/notes`, {
         note: noteText
       });
       loadConversationNotes(activeConversation);
-      toast.success('Note added');
+      toast.success('Not eklendi');
     } catch (error) {
-      toast.error('Failed to add note');
+      toast.error('Not eklenemedi');
     }
   };
 
   // Submit rating
   const submitRating = async (rating, comment) => {
     try {
-      await api.post(`/api/chat-enhancement/conversations/${activeConversation}/rating`, {
+      await api.post(`/chat-enhancement/conversations/${activeConversation}/rating`, {
         rating,
         feedback_comment: comment
       });
-      toast.success('Rating submitted');
+      toast.success('Değerlendirme gönderildi');
       setShowRating(false);
     } catch (error) {
-      toast.error('Failed to submit rating');
+      toast.error('Değerlendirme gönderilemedi');
     }
   };
 
   // Transfer chat
   const transferChat = async (toAgentId, reason) => {
     try {
-      await api.post(`/api/chat-enhancement/conversations/${activeConversation}/transfer`, {
+      await api.post(`/chat-enhancement/conversations/${activeConversation}/transfer`, {
         toAgentId,
         reason
       });
-      toast.success('Chat transferred successfully');
+      toast.success('Sohbet başarıyla transfer edildi');
       setShowTransfer(false);
+      setSelectedAgentForTransfer('');
       // Reload conversations
       loadConversations();
     } catch (error) {
-      toast.error(error.response?.data?.error || 'Failed to transfer chat');
+      toast.error(error.response?.data?.error || 'Sohbet transfer edilemedi');
+    }
+  };
+
+  // Handle transfer confirm
+  const handleTransferConfirm = () => {
+    if (selectedAgentForTransfer) {
+      transferChat(selectedAgentForTransfer, '');
     }
   };
 
@@ -717,9 +769,45 @@ function ChatPage() {
     }
   };
 
+  // Load call history for conversation
+  const loadCallHistory = async (conversationId) => {
+    try {
+      const { data } = await voiceApi.getCallHistory(conversationId);
+      setCallHistory(data.calls || []);
+    } catch (error) {
+      console.error('Failed to load call history:', error);
+    }
+  };
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
+  
+  // Mesajları ve arama kayıtlarını birleştir ve sırala
+  const getCombinedTimeline = () => {
+    const timeline = [];
+    
+    // Mesajları ekle
+    messages.forEach(msg => {
+      timeline.push({
+        type: 'message',
+        data: msg,
+        timestamp: new Date(msg.created_at)
+      });
+    });
+    
+    // Arama kayıtlarını ekle
+    callHistory.forEach(call => {
+      timeline.push({
+        type: 'call',
+        data: call,
+        timestamp: new Date(call.start_time || call.end_time)
+      });
+    });
+    
+    // Zamana göre sırala
+    return timeline.sort((a, b) => a.timestamp - b.timestamp);
+  };
   
   // ===== Voice Call Functions =====
   
@@ -823,6 +911,18 @@ function ChatPage() {
     }
   };
   
+  // Toggle mute
+  const toggleMute = () => {
+    if (localStream) {
+      const audioTracks = localStream.getAudioTracks();
+      audioTracks.forEach(track => {
+        track.enabled = isMuted; // Mute ise aç, açıksa kapat
+      });
+      setIsMuted(!isMuted);
+      toast.info(!isMuted ? '🔇 Mikrofon kapalı' : '🎤 Mikrofon açık');
+    }
+  };
+
   // End call
   const endCall = async () => {
     try {
@@ -847,6 +947,7 @@ function ChatPage() {
       
       setActiveVoiceCall(null);
       setCallStatus('idle');
+      setIsMuted(false); // Reset mute state
       toast('Çağrı sonlandırıldı', { icon: '📞' });
       
     } catch (error) {
@@ -947,37 +1048,45 @@ function ChatPage() {
 
             {/* Mesajlar */}
             <div className="flex-1 overflow-y-auto p-6 bg-gray-50" style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif" }}>
-              {messages.map((msg, index) => (
-                <div
-                  key={index}
-                  className={`mb-4 flex ${['agent', 'bot'].includes(msg.sender_type) ? 'justify-end' : 'justify-start'}`}
-                >
+              {getCombinedTimeline().map((item, index) => {
+                if (item.type === 'call') {
+                  return <CallRecord key={`call-${item.data.id}`} call={item.data} />;
+                }
+                
+                // Mesaj render
+                const msg = item.data;
+                return (
                   <div
-                    className={`max-w-2xl px-4 py-3 rounded-lg ${
-                      ['agent', 'bot'].includes(msg.sender_type)
-                        ? 'bg-primary-600 text-white'
-                        : 'bg-white text-gray-800 shadow'
-                    }`}
-                    style={{ fontSize: '15px', lineHeight: '1.6' }}
+                    key={`msg-${index}`}
+                    className={`mb-4 flex ${['agent', 'bot'].includes(msg.sender_type) ? 'justify-end' : 'justify-start'}`}
                   >
-                    {msg.body && (
-                      <div className={['agent', 'bot'].includes(msg.sender_type) ? 'text-white' : 'text-gray-800'}>
-                        <MarkdownText text={msg.body} isBot={['agent', 'bot'].includes(msg.sender_type)} />
-                      </div>
-                    )}
-                    {msg.attachments && (
-                      <div className="mt-2">
-                        {msg.attachments.map((file, idx) => (
-                          <AttachmentPreview key={idx} file={file} />
-                        ))}
-                      </div>
-                    )}
-                    <p className="text-xs mt-1 opacity-70 text-right">
-                      {new Date(msg.created_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
-                    </p>
+                    <div
+                      className={`max-w-2xl px-4 py-3 rounded-lg ${
+                        ['agent', 'bot'].includes(msg.sender_type)
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-white text-gray-800 shadow'
+                      }`}
+                      style={{ fontSize: '15px', lineHeight: '1.6' }}
+                    >
+                      {msg.body && (
+                        <div className={['agent', 'bot'].includes(msg.sender_type) ? 'text-white' : 'text-gray-800'}>
+                          <MarkdownText text={msg.body} isBot={['agent', 'bot'].includes(msg.sender_type)} />
+                        </div>
+                      )}
+                      {msg.attachments && (
+                        <div className="mt-2">
+                          {msg.attachments.map((file, idx) => (
+                            <AttachmentPreview key={idx} file={file} />
+                          ))}
+                        </div>
+                      )}
+                      <p className="text-xs mt-1 opacity-70 text-right">
+                        {new Date(msg.created_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               {streamingMessage && (
                 <div className="mb-4 flex justify-end">
                   <div
@@ -1051,7 +1160,7 @@ function ChatPage() {
                   className="flex items-center gap-2 px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
                 >
                   <FiUsers />
-                  Transfer
+                  Transfer Et
                 </button>
               </div>
               <div className="flex gap-2">
@@ -1101,19 +1210,19 @@ function ChatPage() {
           <div className="p-4 border-b">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold flex items-center gap-2">
-                <FiTag /> Tags
+                <FiTag /> Etiketler
               </h3>
             </div>
             <div className="flex flex-wrap gap-2 mb-3">
               {conversationTags.map(tag => (
                 <span
-                  key={tag.id}
+                  key={tag.id || tag.tag_id}
                   className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium"
                   style={{ backgroundColor: tag.color + '20', color: tag.color }}
                 >
                   {tag.name}
                   <button
-                    onClick={() => removeTag(tag.tag_id)}
+                    onClick={() => removeTag(tag.tag_id || tag.id)}
                     className="hover:opacity-70"
                   >
                     ×
@@ -1125,8 +1234,8 @@ function ChatPage() {
               onChange={(e) => { if (e.target.value) addTag(e.target.value); e.target.value = ''; }}
               className="w-full text-sm border rounded px-2 py-1"
             >
-              <option value="">Add tag...</option>
-              {tags.filter(t => !conversationTags.find(ct => ct.tag_id === t.id)).map(tag => (
+              <option value="">Etiket ekle...</option>
+              {tags.filter(t => !conversationTags.find(ct => (ct.tag_id || ct.id) === t.id)).map(tag => (
                 <option key={tag.id} value={tag.id}>{tag.name}</option>
               ))}
             </select>
@@ -1135,7 +1244,7 @@ function ChatPage() {
           {/* Notes Section */}
           <div className="p-4 border-b">
             <h3 className="font-semibold flex items-center gap-2 mb-3">
-              <FiFileText /> Internal Notes
+              <FiFileText /> Dahili Notlar
             </h3>
             <div className="space-y-2 mb-3 max-h-48 overflow-y-auto">
               {notes.map(note => (
@@ -1149,7 +1258,7 @@ function ChatPage() {
             </div>
             <div>
               <textarea
-                placeholder="Add internal note..."
+                placeholder="Dahili not ekleyin..."
                 className="w-full text-sm border rounded px-2 py-1"
                 rows="2"
                 onKeyPress={(e) => {
@@ -1166,13 +1275,13 @@ function ChatPage() {
           {/* Rating Section */}
           <div className="p-4 border-b">
             <h3 className="font-semibold flex items-center gap-2 mb-3">
-              <FiStar /> Customer Rating
+              <FiStar /> Müşteri Değerlendirmesi
             </h3>
             <button
               onClick={() => setShowRating(!showRating)}
               className="w-full px-3 py-2 bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 text-sm"
             >
-              Request Rating
+              Değerlendirme İste
             </button>
           </div>
         </div>
@@ -1182,28 +1291,32 @@ function ChatPage() {
       {showTransfer && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-96">
-            <h3 className="text-lg font-bold mb-4">Transfer Chat</h3>
+            <h3 className="text-lg font-bold mb-4">Sohbeti Transfer Et</h3>
             <select
               className="w-full border rounded px-3 py-2 mb-4"
-              onChange={(e) => {
-                if (e.target.value) {
-                  transferChat(e.target.value, '');
-                }
-              }}
+              value={selectedAgentForTransfer}
+              onChange={(e) => setSelectedAgentForTransfer(e.target.value)}
             >
-              <option value="">Select agent...</option>
+              <option value="">Agent seçin...</option>
               {agents.filter(a => a.id !== user.id).map(agent => (
                 <option key={agent.id} value={agent.id}>
-                  {agent.name} - {agent.online_status}
+                  {agent.name} - {agent.online_status === 'online' ? 'Çevrimiçi' : 'Çevrimdışı'}
                 </option>
               ))}
             </select>
             <div className="flex justify-end gap-2">
               <button
-                onClick={() => setShowTransfer(false)}
+                onClick={() => { setShowTransfer(false); setSelectedAgentForTransfer(''); }}
                 className="px-4 py-2 border rounded hover:bg-gray-50"
               >
-                Cancel
+                İptal
+              </button>
+              <button
+                onClick={handleTransferConfirm}
+                disabled={!selectedAgentForTransfer}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Tamam
               </button>
             </div>
           </div>
@@ -1219,8 +1332,10 @@ function ChatPage() {
         onAccept={() => acceptCall(incomingCall?.voiceCallId, incomingCall?.conversationId)}
         onReject={() => rejectCall(incomingCall?.voiceCallId)}
         onEnd={endCall}
+        onMuteToggle={toggleMute}
         callStatus={callStatus}
         duration={callDuration}
+        isMuted={isMuted}
       />
     </div>
   )

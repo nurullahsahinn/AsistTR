@@ -65,7 +65,7 @@ function DashboardPage() {
     <div className="p-8">
       <div className="mb-8">
         <div className="flex items-center gap-3">
-          <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
+          <h1 className="text-3xl font-bold text-gray-800">Ana Sayfa</h1>
           {isAdmin && (
             <span className="px-3 py-1 bg-purple-100 text-purple-800 text-sm font-semibold rounded-full flex items-center gap-1">
               <FiShield className="text-purple-600" />
