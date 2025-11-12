@@ -9,6 +9,7 @@ const multer = require('multer');
 const path = require('path');
 const uploadController = require('../controllers/upload.controller');
 const { authenticate } = require('../middleware/auth.middleware');
+const { widgetAuth } = require('../middleware/widgetAuth.middleware');
 
 // Multer configuration
 const storage = multer.diskStorage({
@@ -43,8 +44,19 @@ const upload = multer({
   fileFilter: fileFilter
 });
 
-// Upload single file
-router.post('/', upload.single('file'), uploadController.uploadFile);
+// Upload single file (authenticated users OR widget with API key)
+router.post('/', 
+  (req, res, next) => {
+    // Eğer Authorization header varsa JWT auth kullan, yoksa widget auth
+    if (req.headers.authorization) {
+      return authenticate(req, res, next);
+    } else {
+      return widgetAuth(req, res, next);
+    }
+  },
+  upload.single('file'), 
+  uploadController.uploadFile
+);
 
 // Delete file
 router.delete('/:filename', authenticate, uploadController.deleteFile);

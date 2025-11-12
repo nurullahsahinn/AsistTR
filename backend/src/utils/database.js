@@ -5,10 +5,15 @@
 const { Pool } = require('pg');
 const logger = require('./logger');
 
-// Connection pool oluştur
+// Connection pool oluştur (optimize edilmiş)
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  max: parseInt(process.env.DB_POOL_MAX) || 20, // Maximum pool size
+  min: parseInt(process.env.DB_POOL_MIN) || 5,  // Minimum pool size
+  idleTimeoutMillis: parseInt(process.env.DB_POOL_IDLE_TIMEOUT) || 30000, // 30 seconds
+  connectionTimeoutMillis: parseInt(process.env.DB_POOL_CONNECTION_TIMEOUT) || 2000, // 2 seconds
+  allowExitOnIdle: false // Keep pool alive
 });
 
 // Database bağlantısını test et

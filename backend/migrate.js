@@ -40,11 +40,20 @@ async function migrate() {
         name VARCHAR(255) NOT NULL,
         email VARCHAR(255) UNIQUE NOT NULL,
         password VARCHAR(255) NOT NULL,
+        password_hash TEXT,
         role VARCHAR(50) DEFAULT 'agent',
+        avatar_url TEXT,
         is_active BOOLEAN DEFAULT true,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       )
+    `);
+    
+    // Add missing columns if they don't exist
+    await client.query(`
+      ALTER TABLE users 
+      ADD COLUMN IF NOT EXISTS password_hash TEXT,
+      ADD COLUMN IF NOT EXISTS avatar_url TEXT
     `);
     logger.info('✓ Users table created');
     
@@ -112,6 +121,107 @@ async function migrate() {
     `);
     logger.info('✓ Knowledge base table created');
     
+    // 7. Widget Sites table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS widget_sites (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name VARCHAR(255) NOT NULL,
+        domain VARCHAR(255) NOT NULL,
+        api_key VARCHAR(255) NOT NULL UNIQUE,
+        settings JSONB DEFAULT '{}'::jsonb,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    logger.info('✓ Widget sites table created');
+    
+    // 8. Departments table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS departments (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        site_id UUID REFERENCES sites(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    logger.info('✓ Departments table created');
+    
+    // 9. Canned Responses table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS canned_responses (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        site_id UUID REFERENCES sites(id) ON DELETE CASCADE,
+        shortcut VARCHAR(100) NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        content TEXT NOT NULL,
+        category VARCHAR(100),
+        created_by UUID REFERENCES users(id),
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    logger.info('✓ Canned responses table created');
+    
+    // 10. Chat Queue table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS chat_queue (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        site_id UUID NOT NULL,
+        visitor_id UUID NOT NULL REFERENCES visitors(id) ON DELETE CASCADE,
+        conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
+        status VARCHAR(20) DEFAULT 'waiting',
+        priority INTEGER DEFAULT 0,
+        department_id UUID REFERENCES departments(id),
+        entered_at TIMESTAMP DEFAULT NOW(),
+        removed_at TIMESTAMP,
+        timeout_at TIMESTAMP,
+        assigned_agent_id UUID REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    logger.info('✓ Chat queue table created');
+    
+    // 11. Offline Messages table  
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS offline_messages (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        site_id UUID NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) NOT NULL,
+        phone VARCHAR(50),
+        department_id UUID REFERENCES departments(id),
+        message TEXT NOT NULL,
+        status VARCHAR(20) DEFAULT 'pending',
+        contacted_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    logger.info('✓ Offline messages table created');
+    
+    // 12. Chat Metrics table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS chat_metrics (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
+        first_response_time INTEGER,
+        avg_response_time INTEGER,
+        total_messages INTEGER DEFAULT 0,
+        agent_messages INTEGER DEFAULT 0,
+        visitor_messages INTEGER DEFAULT 0,
+        duration INTEGER,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    logger.info('✓ Chat metrics table created');
+    
     // 7. Create indexes
     await client.query('CREATE INDEX IF NOT EXISTS idx_sites_api_key ON sites(api_key)');
     await client.query('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)');
@@ -124,6 +234,13 @@ async function migrate() {
     await client.query('CREATE INDEX IF NOT EXISTS idx_conversations_status ON conversations(status)');
     await client.query('CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id)');
     await client.query('CREATE INDEX IF NOT EXISTS idx_knowledge_site ON knowledge_base(site_id)');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_chat_queue_status ON chat_queue(status)');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_chat_queue_site ON chat_queue(site_id)');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_chat_queue_visitor ON chat_queue(visitor_id)');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_offline_messages_site ON offline_messages(site_id)');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_offline_messages_status ON offline_messages(status)');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_canned_responses_site ON canned_responses(site_id)');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_departments_site ON departments(site_id)');
     logger.info('✓ Indexes created');
     
     // 8. Create default site and admin user

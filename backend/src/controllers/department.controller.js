@@ -19,7 +19,14 @@ async function getDepartments(req, res) {
         d.description,
         d.is_active,
         d.created_at,
-        COUNT(u.id) as agent_count
+        COUNT(u.id) as agent_count,
+        json_agg(
+          json_build_object(
+            'id', u.id,
+            'name', u.name,
+            'avatar_url', u.avatar_url
+          )
+        ) FILTER (WHERE u.id IS NOT NULL) as agents
       FROM departments d
       LEFT JOIN users u ON d.id = u.department_id
       WHERE 1=1

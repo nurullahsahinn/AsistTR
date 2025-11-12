@@ -643,6 +643,57 @@ function socketHandler(io, socket) {
     }
   });
   
+  // WebRTC Signaling
+  socket.on('voice:signal', async (data) => {
+    try {
+      const { voiceCallId, signalType, signalData } = data;
+      const connection = activeConnections.get(socket.id);
+
+      if (!connection) return;
+
+      const { type, agentId, visitorId } = connection;
+      const fromId = type === 'agent' ? agentId : visitorId;
+
+      // Sinyali veritabanına kaydet
+      await query(
+        `INSERT INTO webrtc_signaling (voice_call_id, from_type, from_id, signal_type, signal_data)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [voiceCallId, type, fromId, signalType, JSON.stringify(signalData)]
+      );
+
+      // Sinyali karşı tarafa ilet
+      const callInfo = await query('SELECT conversation_id, agent_id, visitor_id FROM voice_calls WHERE id = $1', [voiceCallId]);
+      if (callInfo.rows.length > 0) {
+        const { conversation_id, agent_id, visitor_id } = callInfo.rows[0];
+        
+        let targetSocketId;
+        if (type === 'agent') {
+          // Agent'tan visitor'a
+          for (const [socketId, conn] of activeConnections.entries()) {
+            if (conn.visitorId === visitor_id) {
+              targetSocketId = socketId;
+              break;
+            }
+          }
+        } else {
+          // Visitor'dan agent'a
+          for (const [socketId, conn] of activeConnections.entries()) {
+            if (conn.agentId === agent_id) {
+              targetSocketId = socketId;
+              break;
+            }
+          }
+        }
+        
+        if (targetSocketId) {
+          io.to(targetSocketId).emit('voice:signal', data);
+        }
+      }
+    } catch (error) {
+      logger.error('WebRTC sinyal hatası:', error);
+    }
+  });
+
   // Bağlantı koptuğunda
   socket.on('disconnect', async (reason) => {
     try {

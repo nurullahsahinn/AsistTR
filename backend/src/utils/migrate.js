@@ -154,6 +154,7 @@ async function migrate() {
         agent_id UUID REFERENCES users(id) ON DELETE SET NULL,
         status VARCHAR(50) DEFAULT 'open',
         rating INTEGER,
+        feedback TEXT, -- Eklendi
         created_at TIMESTAMP DEFAULT NOW(),
         closed_at TIMESTAMP
       )
@@ -291,6 +292,20 @@ async function migrate() {
       )
     `);
     logger.info('✅ Voice Calls tablosu oluşturuldu');
+
+    // WebRTC Signaling tablosu
+    await query(`
+      CREATE TABLE IF NOT EXISTS webrtc_signaling (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        voice_call_id UUID REFERENCES voice_calls(id) ON DELETE CASCADE,
+        from_type VARCHAR(50), -- 'agent' or 'visitor'
+        from_id UUID,
+        signal_type VARCHAR(50), -- 'offer', 'answer', 'ice-candidate'
+        signal_data JSONB,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    logger.info('✅ WebRTC Signaling tablosu oluşturuldu');
 
     // Call Queue tablosu
     await query(`
@@ -585,6 +600,66 @@ async function migrate() {
     `);
     logger.info('✅ Conversation Assignments tablosu oluşturuldu');
 
+    // Chat Transfers tablosu (Transfer history için)
+    await query(`
+      CREATE TABLE IF NOT EXISTS chat_transfers (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
+        from_agent_id UUID REFERENCES users(id) ON DELETE SET NULL,
+        to_agent_id UUID REFERENCES users(id) ON DELETE SET NULL,
+        reason TEXT,
+        transferred_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    logger.info('✅ Chat Transfers tablosu oluşturuldu');
+
+    // Push Subscriptions tablosu (Web Push API için)
+    await query(`
+      CREATE TABLE IF NOT EXISTS push_subscriptions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        endpoint TEXT NOT NULL UNIQUE,
+        keys JSONB NOT NULL,
+        user_agent TEXT,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        last_used_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    logger.info('✅ Push Subscriptions tablosu oluşturuldu');
+
+    // Notification Logs tablosu
+    await query(`
+      CREATE TABLE IF NOT EXISTS notification_logs (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        type VARCHAR(50) NOT NULL,
+        channel VARCHAR(20) NOT NULL,
+        title VARCHAR(255),
+        message TEXT,
+        data JSONB,
+        status VARCHAR(20) DEFAULT 'sent',
+        error_message TEXT,
+        sent_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    logger.info('✅ Notification Logs tablosu oluşturuldu');
+
+    // Chat Triggers tablosu (Proactive chat için)
+    await query(`
+      CREATE TABLE IF NOT EXISTS chat_triggers (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        site_id UUID REFERENCES sites(id) ON DELETE CASCADE,
+        trigger_type VARCHAR(50) NOT NULL,
+        trigger_config JSONB DEFAULT '{}',
+        message TEXT,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    logger.info('✅ Chat Triggers tablosu oluşturuldu');
+
     // İndeksler
     await query('CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id)');
     await query('CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at)');
@@ -594,6 +669,13 @@ async function migrate() {
     await query('CREATE INDEX IF NOT EXISTS idx_visitors_session ON visitors(session_id)');
     await query('CREATE INDEX IF NOT EXISTS idx_knowledge_site ON knowledge_base(site_id)');
     await query('CREATE INDEX IF NOT EXISTS idx_knowledge_content_trgm ON knowledge_base USING gin (content gin_trgm_ops)');
+    await query('CREATE INDEX IF NOT EXISTS idx_push_subs_user ON push_subscriptions(user_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_push_subs_active ON push_subscriptions(is_active)');
+    await query('CREATE INDEX IF NOT EXISTS idx_notif_logs_user ON notification_logs(user_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_notif_logs_type ON notification_logs(type)');
+    await query('CREATE INDEX IF NOT EXISTS idx_notif_logs_sent ON notification_logs(sent_at)');
+    await query('CREATE INDEX IF NOT EXISTS idx_chat_triggers_site ON chat_triggers(site_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_chat_triggers_active ON chat_triggers(is_active)');
     
     // Vector index for similarity search (sadece embedding sütunu varsa)
     try {

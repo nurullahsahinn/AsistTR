@@ -25,6 +25,7 @@ if (!process.env.JWT_SECRET) {
 const logger = require('./src/utils/logger');
 const { connectDatabase } = require('./src/utils/database');
 const { connectRedis } = require('./src/utils/redis');
+const { xssSanitize } = require('./src/middleware/xss.middleware');
 
 // Routes
 const authRoutes = require('./src/routes/auth.routes');
@@ -93,6 +94,19 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('combined', { stream: logger.stream }));
+
+// XSS Sanitization (selective - skip for certain routes that need HTML)
+app.use((req, res, next) => {
+  // Skip XSS sanitization for routes that need HTML content
+  const skipRoutes = ['/api/rag', '/rag', '/api/knowledge', '/knowledge'];
+  const shouldSkip = skipRoutes.some(route => req.path.startsWith(route));
+  
+  if (shouldSkip) {
+    return next();
+  }
+  
+  xssSanitize(req, res, next);
+});
 
 // Yüklenen dosyaları public olarak sun
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

@@ -21,7 +21,9 @@ async function migrate() {
         agent_id UUID UNIQUE REFERENCES users(id) ON DELETE CASCADE,
         socket_id VARCHAR(255),
         status VARCHAR(20) DEFAULT 'offline',
+        state VARCHAR(20),
         custom_status VARCHAR(255),
+        state_until TIMESTAMP,
         last_seen TIMESTAMP DEFAULT NOW(),
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()

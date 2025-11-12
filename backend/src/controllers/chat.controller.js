@@ -115,9 +115,10 @@ async function closeConversation(req, res) {
         await unassignAgent(conversationId, agent_id);
       }
       
-      // Agent'lara sohbetin kapandığını bildir
+      // Agent'lara ve visitor'a sohbetin kapandığını bildir
       const io = getIO();
       io.to(`site:${site_id}:agents`).emit('conversation:closed', { conversationId });
+      io.to(`conv:${conversationId}`).emit('conversation:ended', { conversationId });
       logger.info(`Konuşma kapatıldı ve bildirildi: ${conversationId}`);
     } else {
       logger.warn(`Kapatılacak konuşma bulunamadı: ${conversationId}`);
@@ -224,13 +225,13 @@ async function rateConversation(req, res) {
       return res.status(400).json({ error: 'Rating 1-5 arasında olmalı' });
     }
     
-    // Konuşmayı güncelle (sadece rating, feedback kolonu yok)
+    // Konuşmayı güncelle
     const result = await query(
       `UPDATE conversations 
-       SET rating = $1
-       WHERE id = $2
+       SET rating = $1, feedback = $2
+       WHERE id = $3
        RETURNING site_id, agent_id`,
-      [rating, conversationId]
+      [rating, feedback || null, conversationId]
     );
     
     if (result.rows.length === 0) {

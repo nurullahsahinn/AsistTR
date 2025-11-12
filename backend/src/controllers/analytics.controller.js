@@ -378,6 +378,64 @@ async function getDeviceStats(req, res) {
   }
 }
 
+/**
+ * Agent performans metriklerini getir
+ */
+async function getAgentPerformance(req, res) {
+  try {
+    const { siteId, period = '30d' } = req.query;
+
+    let daysAgo = 30;
+    if (period === '7d') daysAgo = 7;
+    else if (period === '30d') daysAgo = 30;
+    else if (period === '90d') daysAgo = 90;
+
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - daysAgo);
+
+    const params = [startDate];
+    let siteFilter = '';
+    if (siteId) {
+      params.push(siteId);
+      siteFilter = `AND c.site_id = $${params.length}`;
+    }
+
+    const queryStr = `
+      SELECT
+        u.id as agent_id,
+        u.name as agent_name,
+        u.avatar_url,
+        COUNT(DISTINCT c.id) as total_chats,
+        AVG(c.rating) as average_rating,
+        AVG(cm.first_response_time_seconds) as avg_first_response_time,
+        AVG(cm.resolution_time_seconds) as avg_resolution_time
+      FROM
+        users u
+      JOIN
+        conversations c ON u.id = c.agent_id
+      LEFT JOIN
+        chat_metrics cm ON c.id = cm.conversation_id
+      WHERE
+        u.role = 'agent'
+        AND c.created_at >= $1
+        ${siteFilter}
+      GROUP BY
+        u.id
+      ORDER BY
+        total_chats DESC;
+    `;
+
+    const result = await query(queryStr, params);
+
+    res.json({ performance: result.rows });
+
+  } catch (error) {
+    logger.error('GetAgentPerformance error:', error);
+    res.status(500).json({ error: 'Failed to fetch agent performance' });
+  }
+}
+
+
 module.exports = {
   trackPageView,
   getDashboardAnalytics,
@@ -385,5 +443,6 @@ module.exports = {
   getVisitorDetails,
   getTopPages,
   getTrafficSources,
-  getDeviceStats
+  getDeviceStats,
+  getAgentPerformance
 };

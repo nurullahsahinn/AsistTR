@@ -20,13 +20,15 @@ const logger = winston.createLogger({
       filename: 'logs/error.log', 
       level: 'error',
       maxsize: 5242880, // 5MB
-      maxFiles: 5
+      maxFiles: 10, // Rotate 10 files
+      tailable: true // Keep oldest files
     }),
     // Tüm logları combined.log dosyasına yaz
     new winston.transports.File({ 
       filename: 'logs/combined.log',
       maxsize: 5242880, // 5MB
-      maxFiles: 5
+      maxFiles: 10, // Rotate 10 files
+      tailable: true // Keep oldest files
     })
   ]
 });

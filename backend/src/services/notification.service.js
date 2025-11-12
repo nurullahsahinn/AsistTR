@@ -178,7 +178,7 @@ async function sendBrowserNotification(userId, notification) {
   return { delivered, total: subsResult.rows.length };
 }
 
-// Send email notification (placeholder - integrate with email service)
+// Send email notification using Nodemailer
 async function sendEmailNotification(userId, notification) {
   const { type, title, message, data } = notification;
   
@@ -194,15 +194,81 @@ async function sendEmailNotification(userId, notification) {
   
   const user = userResult.rows[0];
   
-  // TODO: Integrate with email service (SendGrid, Mailgun, etc.)
-  logger.info(`[EMAIL] Would send to ${user.email}:`, { type, title, message });
+  // Check if email is configured
+  const smtpHost = process.env.SMTP_HOST;
+  const smtpPort = process.env.SMTP_PORT;
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASS;
+  const smtpFrom = process.env.SMTP_FROM || smtpUser || 'noreply@asistr.com';
   
-  // Placeholder implementation
-  return { 
-    sent: true, 
-    recipient: user.email,
-    message: 'Email sending not configured (placeholder)'
-  };
+  if (!smtpHost || !smtpPort || !smtpUser || !smtpPass) {
+    logger.warn('SMTP not configured, skipping email notification');
+    return { 
+      sent: false, 
+      recipient: user.email,
+      message: 'SMTP not configured'
+    };
+  }
+  
+  try {
+    const nodemailer = require('nodemailer');
+    
+    // Create transporter
+    const transporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: parseInt(smtpPort),
+      secure: parseInt(smtpPort) === 465, // true for 465, false for other ports
+      auth: {
+        user: smtpUser,
+        pass: smtpPass
+      },
+      tls: {
+        rejectUnauthorized: process.env.NODE_ENV === 'production'
+      }
+    });
+    
+    // Email content
+    const emailSubject = title || 'AsistTR Bildirimi';
+    const emailHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #2563eb;">${emailSubject}</h2>
+        <p style="color: #374151; line-height: 1.6;">${message}</p>
+        ${data.conversationId ? `
+          <p style="margin-top: 20px;">
+            <a href="${process.env.DASHBOARD_URL || 'http://localhost:3000'}/chat/${data.conversationId}" 
+               style="background-color: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
+              Sohbeti Görüntüle
+            </a>
+          </p>
+        ` : ''}
+        <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
+        <p style="color: #9ca3af; font-size: 12px;">
+          Bu otomatik bir bildirimdir. Lütfen bu e-postaya yanıt vermeyin.
+        </p>
+      </div>
+    `;
+    
+    // Send email
+    const info = await transporter.sendMail({
+      from: `"AsistTR" <${smtpFrom}>`,
+      to: user.email,
+      subject: emailSubject,
+      html: emailHtml,
+      text: message // Plain text fallback
+    });
+    
+    logger.info(`Email sent to ${user.email}:`, info.messageId);
+    
+    return { 
+      sent: true, 
+      recipient: user.email,
+      messageId: info.messageId
+    };
+    
+  } catch (error) {
+    logger.error('Email sending error:', error);
+    throw error;
+  }
 }
 
 // Send desktop notification (via Socket.IO)

@@ -18,7 +18,10 @@ const {
 const { authMiddleware, adminOnly } = require('../middleware/auth.middleware');
 const { apiLimiter } = require('../middleware/rateLimit.middleware');
 
-// Tüm route'lar auth gerektirir
+// Health Check (auth gerektirmez)
+router.get('/health', checkOllamaHealth);
+
+// Tüm diğer route'lar auth gerektirir
 router.use(authMiddleware);
 router.use(apiLimiter);
 
@@ -33,9 +36,6 @@ router.delete('/knowledge/:id', adminOnly, deleteKnowledgeItem);
 // AI Yanıt
 router.post('/generate', generateAnswer);
 router.post('/suggest', getReplysuggestion);
-
-// Health Check
-router.get('/health', checkOllamaHealth);
 
 
 module.exports = router;

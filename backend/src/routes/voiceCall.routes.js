@@ -27,4 +27,7 @@ router.get('/active', authenticate, voiceCallController.getActiveCalls);
 router.post('/availability', authenticate, voiceCallController.updateCallAvailability);
 router.put('/availability', authenticate, voiceCallController.updateCallAvailability);
 
+// Konuşmaya ait arama geçmişini getir
+router.get('/conversation/:conversationId/history', authenticate, voiceCallController.getCallHistory);
+
 module.exports = router;

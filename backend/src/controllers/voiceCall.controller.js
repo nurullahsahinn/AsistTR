@@ -357,11 +357,43 @@ async function updateCallAvailability(req, res) {
   }
 }
 
+/**
+ * Konuşmaya ait arama geçmişini getir
+ */
+async function getCallHistory(req, res) {
+  try {
+    const { conversationId } = req.params;
+    
+    const result = await query(
+      `SELECT 
+        id,
+        conversation_id,
+        status,
+        start_time,
+        end_time,
+        duration,
+        caller_type,
+        disconnect_reason
+      FROM voice_calls
+      WHERE conversation_id = $1
+      ORDER BY start_time DESC`,
+      [conversationId]
+    );
+    
+    res.json({ calls: result.rows });
+    
+  } catch (error) {
+    logger.error('GetCallHistory hatası:', error);
+    res.status(500).json({ error: 'Arama geçmişi alınamadı' });
+  }
+}
+
 module.exports = {
   initiateCall,
   acceptCall,
   rejectCall,
   endCall,
   getActiveCalls,
-  updateCallAvailability
+  updateCallAvailability,
+  getCallHistory
 };

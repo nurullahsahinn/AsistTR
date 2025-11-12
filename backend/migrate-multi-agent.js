@@ -99,6 +99,23 @@ async function migrate() {
     `);
     logger.info('✓ Agent availability table created');
     
+    // 8. Add agent state management table (for breaks, status tracking)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS agent_state (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        agent_id UUID UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+        status VARCHAR(50) DEFAULT 'offline' CHECK (status IN ('available', 'busy', 'break', 'offline')),
+        on_break BOOLEAN DEFAULT false,
+        break_type VARCHAR(50),
+        break_reason TEXT,
+        break_started_at TIMESTAMP,
+        last_activity_at TIMESTAMP DEFAULT NOW(),
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    logger.info('✓ Agent state table created');
+    
     // 7. Add indexes for performance
     await client.query('CREATE INDEX IF NOT EXISTS idx_agents_presence_agent ON agents_presence(agent_id)');
     await client.query('CREATE INDEX IF NOT EXISTS idx_agents_presence_status ON agents_presence(status)');
@@ -106,6 +123,8 @@ async function migrate() {
     await client.query('CREATE INDEX IF NOT EXISTS idx_users_department ON users(department_id)');
     await client.query('CREATE INDEX IF NOT EXISTS idx_conv_assignments_conv ON conversation_assignments(conversation_id)');
     await client.query('CREATE INDEX IF NOT EXISTS idx_conv_assignments_agent ON conversation_assignments(agent_id)');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_agent_state_agent ON agent_state(agent_id)');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_agent_state_status ON agent_state(status)');
     logger.info('✓ Indexes created');
     
     // 8. Insert default department for existing agents

@@ -31,4 +31,7 @@ router.get('/traffic-sources', analyticsController.getTrafficSources);
 // Device stats
 router.get('/device-stats', analyticsController.getDeviceStats);
 
+// Agent performance
+router.get('/agent-performance', analyticsController.getAgentPerformance);
+
 module.exports = router;
